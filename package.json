@@ -1,0 +1,50 @@
+{
+  "name": "timer",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "node start-servers.js",
+    "dev:next": "next dev --turbopack",
+    "dev:custom": "node server.js",
+    "build": "next build",
+    "start": "NODE_ENV=production node start-servers.js",
+    "start:next": "next start",
+    "start:custom": "NODE_ENV=production node server.js",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@radix-ui/react-tabs": "^1.1.12",
+    "@socket.io/redis-adapter": "^8.3.0",
+    "@supabase/supabase-js": "^2.50.5",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "dotenv": "^17.0.0",
+    "ioredis": "^5.6.1",
+    "jose": "^6.0.11",
+    "jsonwebtoken": "^9.0.2",
+    "lucide-react": "^0.525.0",
+    "next": "15.3.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "recharts": "^3.1.0",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
+    "tailwind-merge": "^3.3.1",
+    "ts-node": "^10.9.2"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@tailwindcss/postcss": "^4",
+    "@types/ioredis": "^4.28.10",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/socket.io": "^3.0.1",
+    "@types/socket.io-client": "^1.4.36",
+    "eslint": "^9",
+    "eslint-config-next": "15.3.4",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

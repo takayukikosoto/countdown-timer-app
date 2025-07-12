@@ -1,0 +1,294 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import ServerClock from '@/components/ServerClock';
+import StatusDisplay from '@/components/StatusDisplay';
+import VisitorCounter from '@/components/VisitorCounter';
+import ConnectionStatus from '@/components/ConnectionStatus';
+import CountdownTimer from '@/components/CountdownTimer';
+import TimerMessage from '@/components/TimerMessage';
+import { useSocket } from '@/contexts/SocketContext';
+import { useStatusData } from '@/hooks/useStatusData';
+import { useTimerData } from '@/hooks/useTimerData';
+import CurrentDateTime from '@/components/CurrentDateTime';
+import Link from 'next/link';
+
+export default function Home() {
+  // クエリパラメータからモードを取得
+  const [isViewOnly, setIsViewOnly] = useState(false);
+  
+  // Socket.IO接続
+  const { socket, connected } = useSocket();
+  
+  // ステータスデータの取得
+  const { status, visitorCount, error: statusError } = useStatusData();
+  
+  // タイマーデータの取得
+  const { currentTimer, messages, error: timerError } = useTimerData();
+  
+  // エラーの統合
+  const error = statusError || timerError;
+  
+  // ビューモードの設定
+  const [viewMode, setViewMode] = useState<'view' | 'full' | null>(null);
+  
+  // カスタムメッセージ入力用
+  const [customTitle, setCustomTitle] = useState<string>('');
+  const [customMessage, setCustomMessage] = useState<string>('');
+
+  // フル画面ビューモードの場合、ブラウザのフルスクリーン API を呼び出す
+  useEffect(() => {
+    if (typeof window !== 'undefined' && viewMode === 'full') {
+      const enterFullscreen = async () => {
+        try {
+          if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+            await document.documentElement.requestFullscreen();
+          }
+        } catch {
+          /* ユーザーが拒否するなどの理由で失敗しても無視 */
+        }
+      };
+      enterFullscreen();
+    }
+  }, [viewMode]);
+  
+  // URLパラメータの処理
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const mode = params.get('mode');
+      const title = params.get('title');
+      const message = params.get('message');
+      
+      if (mode === 'view' || mode === 'full') {
+        setViewMode(mode as 'view' | 'full');
+        setIsViewOnly(true);
+        
+        // URLパラメータからタイトルとメッセージを取得
+        if (title) setCustomTitle(decodeURIComponent(title));
+        if (message) setCustomMessage(decodeURIComponent(message));
+      } else {
+        setViewMode(null);
+        setIsViewOnly(false);
+      }
+    }
+  }, []);
+  
+  // ステータスに応じた背景色の設定
+  const getBackgroundColorByStatus = (status: string): string => {
+    switch(status) {
+      case '受付中': return 'bg-gradient-to-br from-green-800 to-teal-900';
+      case '開始前': return 'bg-gradient-to-br from-blue-800 to-indigo-900';
+      case '開催中': return 'bg-gradient-to-br from-purple-800 to-indigo-900';
+      case '休憩中': return 'bg-gradient-to-br from-orange-700 to-amber-900';
+      case '終了': return 'bg-gradient-to-br from-red-800 to-rose-900';
+      default: return 'bg-gradient-to-br from-gray-800 to-slate-900';
+    }
+  };
+
+  return (
+    <div className={`min-h-screen ${isViewOnly ? getBackgroundColorByStatus(status) : 'bg-gradient-to-br from-gray-900 to-blue-900'} text-gray-100 transition-colors duration-500`}>
+      {/* ヘッダー */}
+      {/* ビューモード */}
+      {isViewOnly ? (
+        viewMode === 'full' ? (
+          // 全画面表示モード
+          <div className="flex flex-col h-[100vh]">
+            {/* ヘッダーエリア */}
+            <div className="py-8 text-center">
+              <h1 className="text-4xl md:text-5xl font-bold text-white">
+                {customTitle || 'イベントタイマー'}
+              </h1>
+              <div className="mt-6">
+                <StatusDisplay 
+                  status={status} 
+                  size="lg" 
+                />
+              </div>
+            </div>
+            
+            {/* メインエリア - タイマー */}
+            <div className="flex-grow flex items-center justify-center">
+              {currentTimer && (
+                <div className="transform scale-[2.5] mt-4 mb-4 p-6 rounded-xl backdrop-blur-md bg-black/30 shadow-lg border border-white/10">
+                  <CountdownTimer timer={currentTimer} />
+                </div>
+              )}
+            </div>
+            
+            {/* フッターエリア - メッセージ */}
+            <div className="py-8 text-center">
+              {customMessage ? (
+                <div className="transform scale-[1.5]">
+                  <h2 className="text-2xl md:text-3xl font-medium text-center px-6 py-4 rounded-lg inline-block bg-black/40 backdrop-blur-md border border-white/10 shadow-md">
+                    {customMessage}
+                  </h2>
+                </div>
+              ) : currentTimer && currentTimer.message ? (
+                <div className="transform scale-[1.5]">
+                  <h2 
+                    className="text-2xl md:text-3xl font-medium text-center px-6 py-4 rounded-lg inline-block"
+                    style={{
+                      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                      color: '#ffffff',
+                      backdropFilter: 'blur(4px)',
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)'
+                    }}
+                  >
+                    {currentTimer.message}
+                  </h2>
+                </div>
+              ) : (
+                <TimerMessage 
+                  message={messages && messages.length > 0 ? messages[0] : null} 
+                  className="shadow-md"
+                />
+              )}
+            </div>
+          </div>
+        ) : (
+          // 通常ビューモード
+          <div className="flex flex-col h-[100vh]">
+            {/* ヘッダーエリア */}
+            <div className="py-6 text-center">
+              <h1 className="text-3xl md:text-4xl font-bold text-white">
+                {customTitle || 'イベントタイマー'}
+              </h1>
+              <div className="mt-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* 左カラム */}
+            <div className="flex flex-col gap-8">
+              {/* 時計 */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 flex flex-col items-center">
+                <h2 className="text-xl font-semibold mb-4">現在時刻</h2>
+                <ServerClock size="lg" />
+                <CurrentDateTime />
+              </div>
+
+              {/* ステータス */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 flex flex-col items-center">
+                <h2 className="text-xl font-semibold mb-4">イベントステータス</h2>
+                <StatusDisplay 
+                  status={status} 
+                  size="lg"
+                />
+              </div>
+            </div>
+
+            {/* 右カラム */}
+            <div className="flex flex-col gap-8">
+              {/* 来場者数 */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 flex flex-col items-center">
+                <h2 className="text-xl font-semibold mb-4">来場者数</h2>
+                <VisitorCounter 
+                  count={visitorCount} 
+                  size="lg"
+                />
+              </div>
+
+              {/* タイマー */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+                <h2 className="text-xl font-semibold mb-4">タイマー</h2>
+                {currentTimer ? (
+                  <CountdownTimer timer={currentTimer} onComplete={() => {}} />
+                ) : (
+                  <p className="text-center text-gray-500">タイマーが設定されていません</p>
+                )}
+              </div>
+              
+              {/* ダッシュボードリンク */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mt-8">
+                <h2 className="text-xl font-semibold mb-4">管理メニュー</h2>
+                <div className="flex flex-col gap-4">
+                  <a 
+                    href="/dashboard" 
+                    className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded text-center"
+                  >
+                    管理ダッシュボード
+                  </a>
+                  <a 
+                    href="/timer" 
+                    className="bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded text-center"
+                  >
+                    タイマー管理画面
+                  </a>
+                  <a 
+                    href="/?mode=view" 
+                    className="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded text-center"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    ビューモードで開く
+                  </a>
+                  <a 
+                    href="/?mode=full" 
+                    className="bg-teal-500 hover:bg-teal-600 text-white font-semibold py-2 px-4 rounded text-center"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    タイトル・メッセージ付き全画面表示
+                  </a>
+                </div>
+                
+                {/* カスタムタイトル・メッセージ入力エリア */}
+                <div className="mt-6 border-t pt-4">
+                  <h3 className="text-lg font-semibold mb-3">カスタム表示設定</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label htmlFor="customTitle" className="block text-sm font-medium mb-1">カスタムタイトル</label>
+                      <input
+                        type="text"
+                        id="customTitle"
+                        className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                        placeholder="イベントタイトルを入力"
+                        value={customTitle}
+                        onChange={(e) => setCustomTitle(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="customMessage" className="block text-sm font-medium mb-1">カスタムメッセージ</label>
+                      <textarea
+                        id="customMessage"
+                        className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                        placeholder="表示したいメッセージを入力"
+                        rows={2}
+                        value={customMessage}
+                        onChange={(e) => setCustomMessage(e.target.value)}
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <a 
+                        href={`/?mode=view&title=${encodeURIComponent(customTitle)}&message=${encodeURIComponent(customMessage)}`}
+                        className="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded text-center flex-1"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        カスタムビューモード
+                      </a>
+                      <a 
+                        href={`/?mode=full&title=${encodeURIComponent(customTitle)}&message=${encodeURIComponent(customMessage)}`}
+                        className="bg-teal-500 hover:bg-teal-600 text-white font-semibold py-2 px-4 rounded text-center flex-1"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        カスタム全画面表示
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* フッター */}
+      <footer className="bg-gradient-to-r from-gray-800/80 to-gray-900/80 backdrop-blur-md shadow-inner p-4 mt-8 border-t border-white/10">
+        <div className="container mx-auto text-center text-sm text-gray-300">
+          <p className="font-medium">{new Date().getFullYear()} イベントタイマー</p>
+        </div>
+      </footer>
+    </div>
+  );
+}
