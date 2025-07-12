@@ -6,7 +6,6 @@ import { useSocket } from '@/contexts/SocketContext';
 // ステータスデータを管理するためのカスタムフック
 export function useStatusData() {
   const [status, setStatus] = useState<string>('準備中');
-  const [visitorCount, setVisitorCount] = useState<number>(0);
   const [serverTime, setServerTime] = useState<number>(Date.now());
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +20,6 @@ export function useStatusData() {
       }
       const data = await response.json();
       setStatus(data.status);
-      setVisitorCount(data.visitors);
       setServerTime(data.serverTime);
       return data;
     } catch (err) {
@@ -63,69 +61,7 @@ export function useStatusData() {
     }
   };
 
-  // 来場者数を増加
-  const incrementVisitors = async (increment: number = 1) => {
-    try {
-      const response = await fetch('/api/status', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'increment_visitors',
-          increment
-        }),
-      });
-      
-      if (!response.ok) {
-        throw new Error('来場者数の更新に失敗しました');
-      }
-      
-      const data = await response.json();
-      
-      // Socket.IOでも送信（冗長化のため）
-      if (socket && connected) {
-        socket.emit('count:increment', { increment });
-      }
-      
-      setVisitorCount(data.visitors);
-      return data.visitors;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '不明なエラーが発生しました');
-      return null;
-    }
-  };
-
-  // 来場者数を設定
-  const setVisitors = async (count: number) => {
-    try {
-      const response = await fetch('/api/status', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'set_visitors',
-          count
-        }),
-      });
-      
-      if (!response.ok) {
-        throw new Error('来場者数の設定に失敗しました');
-      }
-      
-      // Socket.IOでも送信（冗長化のため）
-      if (socket && connected) {
-        socket.emit('count:set', { count });
-      }
-      
-      setVisitorCount(count);
-      return true;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '不明なエラーが発生しました');
-      return false;
-    }
-  };
+  // 来場者数関連の機能はuseVisitorCountフックに移行
 
   // 初期データ読み込みとSocket.IOイベントリスナーの設定
   useEffect(() => {
@@ -135,30 +71,22 @@ export function useStatusData() {
     // Socket.IOイベントリスナー
     if (socket && connected) {
       // ステータス更新イベント
-      socket.on('status:update', (data) => {
+      socket.on('status:update', (data: { status?: string }) => {
         if (data.status) {
           setStatus(data.status);
         }
       });
       
-      // 来場者数更新イベント
-      socket.on('count:update', (data) => {
-        if (data.visitors !== undefined) {
-          setVisitorCount(data.visitors);
-        }
-      });
-      
       // サーバー時刻同期イベント
-      socket.on('server:time', (data) => {
+      socket.on('server:time', (data: { time?: number }) => {
         if (data.time) {
           setServerTime(data.time);
         }
       });
       
       // 接続時の初期状態
-      socket.on('state', (data) => {
+      socket.on('state', (data: { status?: string; serverTime?: number }) => {
         setStatus(data.status || '準備中');
-        setVisitorCount(data.visitors || 0);
         setServerTime(data.serverTime || Date.now());
         setLoading(false);
       });
@@ -167,7 +95,6 @@ export function useStatusData() {
     return () => {
       if (socket) {
         socket.off('status:update');
-        socket.off('count:update');
         socket.off('server:time');
         socket.off('state');
       }
@@ -176,13 +103,10 @@ export function useStatusData() {
 
   return {
     status,
-    visitorCount,
     serverTime,
     loading,
     error,
     fetchStatus,
-    updateStatus,
-    incrementVisitors,
-    setVisitors
+    updateStatus
   };
 }

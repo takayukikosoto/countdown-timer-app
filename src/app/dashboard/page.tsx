@@ -9,6 +9,7 @@ import ConnectionStatus from '@/components/ConnectionStatus';
 import ControlPanel from '@/components/ControlPanel';
 import { useSocket } from '@/contexts/SocketContext';
 import { useStatusData } from '@/hooks/useStatusData';
+import { useVisitorCount } from '@/hooks/useVisitorCount';
 import { formatDateTime } from '@/lib/timeSync';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -86,11 +87,16 @@ export default function Dashboard() {
   // ステータスデータの取得
   const {
     status,
-    visitorCount,
     error,
-    updateStatus,
-    incrementVisitors
+    updateStatus
   } = useStatusData();
+  
+  // Supabaseから来場者数を取得
+  const {
+    count: visitorCount,
+    incrementCount: incrementVisitors,
+    resetCount: resetVisitorCount
+  } = useVisitorCount();
 
   // 認証ロード中の表示
   if (loading) {
@@ -181,6 +187,14 @@ export default function Dashboard() {
                   count={visitorCount} 
                   size="md"
                 />
+                <div className="mt-2">
+                  <button
+                    onClick={() => resetVisitorCount()}
+                    className="text-xs bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded"
+                  >
+                    リセット
+                  </button>
+                </div>
               </div>
             </div>
 

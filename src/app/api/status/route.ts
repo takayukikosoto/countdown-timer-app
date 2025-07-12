@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getStatus, setStatus, getVisitorCount, incrementVisitorCount, setVisitorCount } from '@/lib/redis';
+import { getStatusFromDB, setStatusInDB } from '@/lib/status';
+import { getVisitorsFromDB, incrementVisitorsInDB, setVisitorsInDB, resetVisitorsInDB } from '@/lib/visitors';
 
 // ステータス情報を取得するAPI
 export async function GET(request: Request) {
@@ -9,15 +10,15 @@ export async function GET(request: Request) {
     const action = searchParams.get('action');
 
     if (action === 'visitors') {
-      // 来場者数を取得
-      const visitorCount = await getVisitorCount();
+      // 来場者数を取得（Supabaseから）
+      const visitorCount = await getVisitorsFromDB();
       return NextResponse.json({ visitors: visitorCount });
     } 
     else {
-      // ステータスと来場者数を取得
+      // ステータスと来場者数を取得（Supabaseから）
       const [status, visitorCount] = await Promise.all([
-        getStatus(),
-        getVisitorCount()
+        getStatusFromDB(),
+        getVisitorsFromDB()
       ]);
       
       return NextResponse.json({
@@ -50,12 +51,12 @@ export async function POST(request: Request) {
         );
       }
       
-      await setStatus(status);
+      await setStatusInDB(status);
       return NextResponse.json({ success: true, status });
     } 
     else if (action === 'increment_visitors') {
       const { increment = 1 } = body;
-      const newCount = await incrementVisitorCount(increment);
+      const newCount = await incrementVisitorsInDB(increment);
       return NextResponse.json({ success: true, visitors: newCount });
     }
     else if (action === 'set_visitors') {
@@ -67,8 +68,12 @@ export async function POST(request: Request) {
         );
       }
       
-      await setVisitorCount(count);
-      return NextResponse.json({ success: true, visitors: count });
+      const newCount = await setVisitorsInDB(count);
+      return NextResponse.json({ success: true, visitors: newCount });
+    }
+    else if (action === 'reset_visitors') {
+      const newCount = await resetVisitorsInDB();
+      return NextResponse.json({ success: true, visitors: newCount });
     }
     else {
       return NextResponse.json(

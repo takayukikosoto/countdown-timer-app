@@ -9,6 +9,7 @@ import CountdownTimer from '@/components/CountdownTimer';
 import TimerMessage from '@/components/TimerMessage';
 import { useSocket } from '@/contexts/SocketContext';
 import { useStatusData } from '@/hooks/useStatusData';
+import { useVisitorCount } from '@/hooks/useVisitorCount';
 import { useTimerData } from '@/hooks/useTimerData';
 import CurrentDateTime from '@/components/CurrentDateTime';
 import Link from 'next/link';
@@ -22,7 +23,10 @@ export default function Home() {
   const { socket, connected } = useSocket();
   
   // ステータスデータの取得
-  const { status, visitorCount, error: statusError } = useStatusData();
+  const { status, error: statusError } = useStatusData();
+  
+  // Supabaseから来場者数を取得
+  const { count: visitorCount } = useVisitorCount();
   
   // タイマーデータの取得
   const { currentTimer, messages, error: timerError } = useTimerData();

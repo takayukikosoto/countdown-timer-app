@@ -1,7 +1,10 @@
 import { Server as NetServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
-import { getRedisClient, REDIS_CHANNELS, getStatus, getVisitorCount, setStatus, incrementVisitorCount } from './redis';
+import { REDIS_CHANNELS } from './constants';
+import { getRedisClient } from './redis';
+import { getStatusFromDB, setStatusInDB } from './status';
+import { getVisitorsFromDB, incrementVisitorsInDB } from './visitors';
 import { 
   getCurrentTimer,
   saveTimer, 
@@ -107,9 +110,9 @@ export function getSocketServer(server: NetServer): SocketIOServer {
     const user = socket.data.user as UserInfo;
     console.log(`クライアント接続: ${socket.id}, ロール: ${user.role}`);
 
-    // 現在の状態を取得
-    const status = await getStatus();
-    const visitorCount = await getVisitorCount();
+    // 現在の状態を取得（ステータスと来場者数はSupabaseから）
+    const status = await getStatusFromDB();
+    const visitorCount = await getVisitorsFromDB();
     const serverTime = Date.now();
 
     // 初期状態をクライアントに送信
@@ -135,10 +138,10 @@ export function getSocketServer(server: NetServer): SocketIOServer {
         const { status } = data;
         console.log(`ステータス更新: ${status} (by ${socket.id})`);
         
-        // Redis にステータスを保存（通知は redis.ts 内で実行）
-        await setStatus(status);
+        // ステータスを更新（Supabase）
+        await setStatusInDB(status);
         
-        // 全クライアントに通知
+        // 全クライアントに通知（Socket.IOイベント）
         io.emit('status:update', { status });
       } else {
         socket.emit('error', { message: '権限がありません' });
@@ -152,8 +155,8 @@ export function getSocketServer(server: NetServer): SocketIOServer {
         const { increment = 1 } = data;
         console.log(`来場者数増加: +${increment} (by ${socket.id})`);
         
-        // Redis で来場者数を増加（通知は redis.ts 内で実行）
-        const newCount = await incrementVisitorCount(increment);
+        // Supabaseで来場者数を増加
+        const newCount = await incrementVisitorsInDB(increment);
         
         // 全クライアントに通知
         io.emit('count:update', { visitors: newCount });
@@ -170,8 +173,8 @@ export function getSocketServer(server: NetServer): SocketIOServer {
           const { increment = 1 } = data;
           console.log(`来場者数増加: +${increment} (by ${socket.id})`);
           
-          // Redis で来場者数を増加（通知は redis.ts 内で実行）
-          const newCount = await incrementVisitorCount(increment);
+          // Supabaseで来場者数を増加
+          const newCount = await incrementVisitorsInDB(increment);
           
           // 全クライアントに通知
           io.emit('count:update', { visitors: newCount });
@@ -461,7 +464,7 @@ export function getSocketServer(server: NetServer): SocketIOServer {
   
   // タイマーイベント
   subClient.subscribe(REDIS_CHANNELS.TIMER);
-  subClient.on('message', (channel, message) => {
+  subClient.on('message', (channel: string, message: string) => {
     if (channel === REDIS_CHANNELS.TIMER) {
       const data = JSON.parse(message);
       io.emit('timer:sync', data);
@@ -470,7 +473,7 @@ export function getSocketServer(server: NetServer): SocketIOServer {
   
   // ステータスイベント
   subClient.subscribe(REDIS_CHANNELS.STATUS);
-  subClient.on('message', (channel, message) => {
+  subClient.on('message', (channel: string, message: string) => {
     if (channel === REDIS_CHANNELS.STATUS) {
       const data = JSON.parse(message);
       io.emit('status:update', data);
@@ -479,7 +482,7 @@ export function getSocketServer(server: NetServer): SocketIOServer {
   
   // 来場者数イベント
   subClient.subscribe(REDIS_CHANNELS.VISITORS);
-  subClient.on('message', (channel, message) => {
+  subClient.on('message', (channel: string, message: string) => {
     if (channel === REDIS_CHANNELS.VISITORS) {
       const data = JSON.parse(message);
       io.emit('count:update', data);
@@ -488,7 +491,7 @@ export function getSocketServer(server: NetServer): SocketIOServer {
   
   // メッセージイベント
   subClient.subscribe(REDIS_CHANNELS.MESSAGE);
-  subClient.on('message', (channel, message) => {
+  subClient.on('message', (channel: string, message: string) => {
     if (channel === REDIS_CHANNELS.MESSAGE) {
       const data = JSON.parse(message);
       

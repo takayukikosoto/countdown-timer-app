@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-require('dotenv').config();
+require('dotenv').config({ path: '.env.local' });
 
 // TypeScript のトランスパイルが必要
 require('ts-node').register({
