@@ -12,25 +12,24 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const router = useRouter();
-  const { login, isAdmin, user } = useAuth();
+  const { login, isAdmin, isStaff, user } = useAuth();
 
-  // すでにログインしている場合はダッシュボードにリダイレクト
+  // すでにログインしている場合は適切なページにリダイレクト
   useEffect(() => {
-    if (!loading) {
-      if (user) {
-        console.log('ログイン済みユーザーを検出:', user);
-        if (isAdmin) {
-          console.log('管理者権限を確認、ダッシュボードにリダイレクトします');
-          router.push('/dashboard');
-        } else {
-          console.log('管理者権限がありません');
-          router.push('/');
-        }
+    if (!loading && user) {
+      console.log('ログイン済みユーザーを検出:', user);
+      if (isAdmin) {
+        console.log('管理者権限を確認、ダッシュボードにリダイレクトします');
+        router.push('/dashboard');
+      } else if (isStaff) {
+        console.log('スタッフ権限を確認、スタッフページにリダイレクトします');
+        router.push('/staff');
       } else {
-        console.log('ログインしていません');
+        console.log('一般ユーザー、ホームにリダイレクトします');
+        router.push('/');
       }
     }
-  }, [user, isAdmin, loading, router]);
+  }, [user, isAdmin, isStaff, loading, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,10 +55,20 @@ export default function LoginPage() {
         console.log('ログイン成功');
         // 成功メッセージを表示した後、ダッシュボードにリダイレクト
         setTimeout(() => {
-          console.log('ダッシュボードにリダイレクトします');
-          // router.pushとwindow.location.hrefの両方を使用して確実にリダイレクト
-          router.push('/dashboard');
-          window.location.href = '/dashboard';
+          // 権限に応じて適切なページにリダイレクト
+          if (isAdmin) {
+            console.log('管理者権限を確認、ダッシュボードにリダイレクトします');
+            router.push('/dashboard');
+            window.location.href = '/dashboard';
+          } else if (isStaff) {
+            console.log('スタッフ権限を確認、スタッフページにリダイレクトします');
+            router.push('/staff');
+            window.location.href = '/staff';
+          } else {
+            console.log('一般ユーザー、ホームにリダイレクトします');
+            router.push('/');
+            window.location.href = '/';
+          }
         }, 1000);
       } else {
         setError(result.message || 'ログインに失敗しました');

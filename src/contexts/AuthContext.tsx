@@ -9,6 +9,8 @@ type AuthContextType = {
   user: AuthSession['user'] | null;
   loading: boolean;
   isAdmin: boolean;
+  isStaff: boolean;
+  userRole: string | null;
   login: (username: string, password: string) => Promise<{ success: boolean; message?: string }>;
   logout: () => Promise<boolean>;
 };
@@ -19,6 +21,8 @@ const defaultAuthContext: AuthContextType = {
   user: null,
   loading: true,
   isAdmin: false,
+  isStaff: false,
+  userRole: null,
   login: async () => ({ success: false }),
   logout: async () => false,
 };
@@ -37,6 +41,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<AuthSession['user'] | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isStaff, setIsStaff] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   // 初期認証状態の確認
   useEffect(() => {
@@ -64,11 +70,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
             setSession(session);
             setUser(session?.user || null);
             
-            // 管理者権限の確認
+            // ユーザーロールと権限の確認
             const role = session?.user?.user_metadata?.role;
             const hasAdminRole = role === 'admin';
-            console.log('ユーザーロール:', role, '管理者権限:', hasAdminRole);
+            const hasStaffRole = role === 'staff' || role === 'admin'; // 管理者はスタッフ権限も持つ
+            console.log('ユーザーロール:', role, '管理者権限:', hasAdminRole, 'スタッフ権限:', hasStaffRole);
             setIsAdmin(hasAdminRole);
+            setIsStaff(hasStaffRole);
+            setUserRole(role || null);
           }
         } else {
           console.log('セッションが見つかりませんでした');
@@ -135,6 +144,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const role = session.user.user_metadata?.role;
       console.log('ユーザーロール:', role);
       setIsAdmin(role === 'admin');
+      setIsStaff(role === 'staff' || role === 'admin');
+      setUserRole(role || null);
       
       // ログイン成功時のみダッシュボードにリダイレクト
       setTimeout(() => {
@@ -163,6 +174,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setSession(null);
       setUser(null);
       setIsAdmin(false);
+      setIsStaff(false);
+      setUserRole(null);
       
       console.log('ログアウトしました');
       return true;
@@ -178,6 +191,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     user,
     loading,
     isAdmin,
+    isStaff,
+    userRole,
     login: handleLogin,
     logout: handleLogout,
   };

@@ -449,6 +449,12 @@ export default function Home() {
                       管理ダッシュボード
                     </a>
                     <a 
+                      href="/staff" 
+                      className="bg-green-600/80 hover:bg-green-700/90 text-white font-medium py-2 px-4 rounded-md text-center transition-all duration-200 shadow-sm border border-white/10"
+                    >
+                      スタッフページ
+                    </a>
+                    <a 
                       href="/timer" 
                       className="bg-purple-600/80 hover:bg-purple-700/90 text-white font-medium py-2 px-4 rounded-md text-center transition-all duration-200 shadow-sm border border-white/10"
                     >
