@@ -4,10 +4,11 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { AuthSession } from '@/lib/supabase';
 
 // 認証コンテキストの型定義
-type AuthContextType = {
+export type AuthContextType = {
   session: AuthSession | null;
   user: AuthSession['user'] | null;
   loading: boolean;
+  isLoading: boolean; // isLoadingはloadingと同じ値（互換性のため）
   isAdmin: boolean;
   isStaff: boolean;
   userRole: string | null;
@@ -20,6 +21,7 @@ const defaultAuthContext: AuthContextType = {
   session: null,
   user: null,
   loading: true,
+  isLoading: true,
   isAdmin: false,
   isStaff: false,
   userRole: null,
@@ -190,6 +192,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     session,
     user,
     loading,
+    isLoading: loading, // isLoadingとloadingを同期
     isAdmin,
     isStaff,
     userRole,

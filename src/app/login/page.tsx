@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
+import QRCodeScanner from '@/components/QRCodeScanner';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -11,7 +12,9 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showQRScanner, setShowQRScanner] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { login, isAdmin, isStaff, user } = useAuth();
 
   // すでにログインしている場合は適切なページにリダイレクト
@@ -30,7 +33,16 @@ export default function LoginPage() {
       }
     }
   }, [user, isAdmin, isStaff, loading, router]);
+  
+  // URLからQRコードトークンを取得
+  useEffect(() => {
+    const qrToken = searchParams.get('qr');
+    if (qrToken) {
+      handleQRLogin(qrToken);
+    }
+  }, [searchParams]);
 
+  // 通常のログイン処理
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -78,6 +90,68 @@ export default function LoginPage() {
       console.error('Login error:', err);
     } finally {
       setLoading(false);
+    }
+  };
+  
+  // QRコードによるログイン処理
+  const handleQRLogin = async (token: string) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await fetch('/api/auth/qr-login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token }),
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok && result.success) {
+        setShowSuccess(true);
+        console.log('QRコードログイン成功');
+        
+        // 成功メッセージを表示した後、適切なページにリダイレクト
+        setTimeout(() => {
+          const user = result.user;
+          if (user.role === 'admin') {
+            router.push('/dashboard');
+            window.location.href = '/dashboard';
+          } else if (user.role === 'staff') {
+            router.push('/staff');
+            window.location.href = '/staff';
+          } else {
+            router.push('/');
+            window.location.href = '/';
+          }
+        }, 1000);
+      } else {
+        setError(result.error || 'QRコードログインに失敗しました');
+      }
+    } catch (err) {
+      setError('QRコードログイン処理中にエラーが発生しました');
+      console.error('QR login error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // QRコードスキャナーを表示
+  const showScanner = () => {
+    setShowQRScanner(true);
+  };
+  
+  // QRコードスキャナーを閉じる
+  const closeScanner = () => {
+    setShowQRScanner(false);
+  };
+  
+  // QRコードスキャン結果の処理
+  const handleScan = (token: string) => {
+    if (token) {
+      handleQRLogin(token);
     }
   };
 
@@ -156,11 +230,43 @@ export default function LoginPage() {
                 </button>
               </div>
               
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={showScanner}
+                  disabled={loading}
+                  className={`w-full py-3 px-4 rounded-lg text-white font-medium transition-all ${
+                    loading 
+                      ? 'bg-gray-700/50 cursor-not-allowed' 
+                      : 'bg-gray-600 hover:bg-gray-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-center">
+                    <svg className="h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                    </svg>
+                    QRコードでログイン
+                  </div>
+                </button>
+              </div>
+              
               <div className="text-center mt-4">
                 <Link href="/" className="text-sm text-gray-400 hover:text-white transition-colors">
                   ホームに戻る
                 </Link>
               </div>
+              
+              {/* QRコードスキャナー */}
+              {showQRScanner && (
+                <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+                  <div className="w-full max-w-md px-4">
+                    <QRCodeScanner 
+                      onScan={handleScan} 
+                      onClose={closeScanner} 
+                    />
+                  </div>
+                </div>
+              )}
             </form>
           )}
         </div>

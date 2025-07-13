@@ -5,7 +5,7 @@ import { useVisitorCount } from '@/hooks/useVisitorCount';
 
 export interface StaffControlPanelProps {
   currentStatus: string;
-  onStatusChange: (status: string) => Promise<void>;
+  onStatusChange: (status: string) => Promise<boolean>;
   attendeeCount: number;
 }
 

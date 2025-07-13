@@ -239,9 +239,15 @@ export default function Dashboard() {
               </Link>
               <Link 
                 href="/admin/visitors" 
-                className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded text-center block"
+                className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded text-center block mb-3"
               >
                 来場者数管理
+              </Link>
+              <Link 
+                href="/admin/staff" 
+                className="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-4 rounded text-center block"
+              >
+                スタッフ管理
               </Link>
             </div>
 

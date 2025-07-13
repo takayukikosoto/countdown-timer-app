@@ -100,13 +100,8 @@ function checkRedisServer() {
 async function main() {
   log('System', 'Starting all servers...', colors.cyan);
   
-  // Redisサーバーの確認
-  const redisRunning = await checkRedisServer();
-  
-  if (!redisRunning) {
-    log('Redis', 'Starting Redis server...', colors.yellow);
-    startProcess('redis-server', [], 'Redis', colors.magenta);
-  }
+  // Redisサーバーは Docker で動作中と仕定
+  log('Redis', 'Using Redis server running in Docker on port 6381', colors.green);
   
   // カスタムサーバー（Socket.IO + Next.js）の起動
   const customServerCommand = isDev ? 'node' : 'NODE_ENV=production node';

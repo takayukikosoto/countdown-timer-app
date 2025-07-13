@@ -8,12 +8,14 @@ import { useStatusData } from '@/hooks/useStatusData';
 import { useTimerData } from '@/hooks/useTimerData';
 import StatusDisplay from '@/components/StatusDisplay';
 import StaffControlPanel from '@/components/StaffControlPanel';
+import StaffStatusPanel from '@/components/StaffStatusPanel';
 import { useVisitorCount } from '@/hooks/useVisitorCount';
 import { useSocket } from '@/contexts/SocketContext';
 
 export default function StaffPage() {
-  const { user, loading, isStaff } = useAuth();
+  const { user, isLoading, isAdmin, isStaff } = useAuth();
   const router = useRouter();
+  const [staffName, setStaffName] = useState<string>('');
   const { status, updateStatus } = useStatusData();
   const { currentTimer } = useTimerData();
   const { count: visitorCount } = useVisitorCount();
@@ -22,10 +24,33 @@ export default function StaffPage() {
 
   // 認証チェック
   useEffect(() => {
-    if (!loading && !isStaff) {
+    if (!isLoading && !isStaff) {
       router.push('/login');
     }
-  }, [loading, isStaff, router]);
+    
+    // ユーザー情報からスタッフ名を取得
+    if (user) {
+      // Supabaseから直接スタッフ情報を取得
+      const fetchStaffInfo = async () => {
+        try {
+          const response = await fetch('/api/staff/info');
+          if (response.ok) {
+            const data = await response.json();
+            // display_nameを使用
+            setStaffName(data.display_name || user.user_metadata?.name || '');
+          } else {
+            // フォールバックとしてuser_metadataの名前を使用
+            setStaffName(user.user_metadata?.name || '');
+          }
+        } catch (error) {
+          console.error('スタッフ情報取得エラー:', error);
+          setStaffName(user.user_metadata?.name || '');
+        }
+      };
+      
+      fetchStaffInfo();
+    }
+  }, [isLoading, isStaff, router, user]);
 
   // 来場者数の更新
   useEffect(() => {
@@ -50,7 +75,7 @@ export default function StaffPage() {
   }, [socket, connected]);
 
   // ローディング中の表示
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="text-2xl font-bold">読み込み中...</div>
@@ -65,7 +90,15 @@ export default function StaffPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="mb-6 text-3xl font-bold">スタッフダッシュボード</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">スタッフダッシュボード</h1>
+        {staffName && (
+          <div className="bg-blue-100 text-blue-800 px-4 py-2 rounded-lg">
+            <span className="font-medium">ログイン中: </span>
+            <span>{staffName}</span>
+          </div>
+        )}
+      </div>
       
       <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2">
         <div className="rounded-lg bg-white p-6 shadow-md">
@@ -84,7 +117,12 @@ export default function StaffPage() {
         </div>
         
         <div className="rounded-lg bg-white p-6 shadow-md">
-          <h2 className="mb-4 text-xl font-semibold">スタッフ操作パネル</h2>
+          <h2 className="mb-4 text-xl font-semibold">スタッフステータス</h2>
+          <StaffStatusPanel />
+        </div>
+        
+        <div className="rounded-lg bg-white p-6 shadow-md">
+          <h2 className="mb-4 text-xl font-semibold">イベント操作パネル</h2>
           <StaffControlPanel 
             currentStatus={status} 
             onStatusChange={updateStatus} 
