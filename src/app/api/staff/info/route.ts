@@ -17,10 +17,10 @@ export async function GET(request: NextRequest) {
     // スタッフIDを取得
     const staffId = authResult.user.id;
 
-    // スタッフ情報を取得
+    // スタッフ情報を取得（所属・ポジション・レベルの情報も含める）
     const { data, error } = await supabase
       .from('admin_users')
-      .select('id, username, display_name, created_at')
+      .select('id, username, display_name, created_at, company, staff_position, staff_level')
       .eq('id', staffId)
       .single();
 
@@ -37,7 +37,10 @@ export async function GET(request: NextRequest) {
       id: data.id,
       username: data.username,
       display_name: data.display_name,
-      created_at: data.created_at
+      created_at: data.created_at,
+      company: data.company,
+      staff_position: data.staff_position,
+      staff_level: data.staff_level
     });
 
   } catch (error) {

@@ -66,13 +66,21 @@ export function useStatusData() {
   // 初期データ読み込みとSocket.IOイベントリスナーの設定
   useEffect(() => {
     // 初期データの読み込み
-    fetchStatus();
+    console.log('ステータスデータを取得します...');
+    fetchStatus().then(data => {
+      if (data) {
+        console.log('API経由でステータスを取得しました:', data.status);
+      }
+    });
     
     // Socket.IOイベントリスナー
     if (socket && connected) {
+      console.log('Socket.IOイベントリスナーを設定します');
+      
       // ステータス更新イベント
       socket.on('status:update', (data: { status?: string }) => {
         if (data.status) {
+          console.log(`Socket.IOイベント: ステータス更新 ${status} → ${data.status}`);
           setStatus(data.status);
         }
       });
@@ -86,20 +94,31 @@ export function useStatusData() {
       
       // 接続時の初期状態
       socket.on('state', (data: { status?: string; serverTime?: number }) => {
-        setStatus(data.status || '準備中');
+        console.log('Socket.IOイベント: 初期状態受信', data);
+        if (data.status) {
+          console.log(`初期ステータスを設定: ${data.status}`);
+          setStatus(data.status);
+        } else {
+          setStatus('準備中');
+        }
         setServerTime(data.serverTime || Date.now());
         setLoading(false);
       });
+      
+      // 状態リクエスト
+      console.log('現在の状態をリクエストします');
+      socket.emit('get:state');
     }
     
     return () => {
       if (socket) {
+        console.log('Socket.IOイベントリスナーを解除します');
         socket.off('status:update');
         socket.off('server:time');
         socket.off('state');
       }
     };
-  }, [socket, connected]);
+  }, [socket, connected, status]);
 
   return {
     status,

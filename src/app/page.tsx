@@ -91,6 +91,9 @@ export default function Home() {
     return () => window.removeEventListener('keydown', keydownHandler);
   }, [viewMode, toggleFullscreen]);
   
+  // 注意: 定期的な自動リロードは削除しました
+  // ステータスやタイマーの変更時のみリロードされます
+  
   // URLパラメータの処理
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -131,23 +134,32 @@ export default function Home() {
     }
   };
   
-  // 全画面表示モードでのステータス変更検知と自動リロード
+  // 全画面表示モードでのステータス変更の監視
   useEffect(() => {
     if (!isViewOnly || viewMode !== 'full') return;
-    if (!status || status === lastStatus) return;
+    if (!status) return; // ステータスが空の場合は何もしない
     
-    console.log(`ステータスが変更されました: ${lastStatus} → ${status}`);
-    setLastStatus(status);
+    console.log(`現在のステータス: ${status}, 前回のステータス: ${lastStatus || 'なし'}`);
     
-    // 連続リロードを防ぐため、少し遅延させてからリロード
-    if (reloadTimeoutRef.current) {
-      clearTimeout(reloadTimeoutRef.current);
+    // ステータスが変更された場合のみ処理
+    if (lastStatus && status !== lastStatus) {
+      console.log(`ステータスが変更されました: ${lastStatus} → ${status}`);
+      setLastStatus(status);
+      
+      // 連続リロードを防ぐため、少し遅延させてからリロード
+      if (reloadTimeoutRef.current) {
+        clearTimeout(reloadTimeoutRef.current);
+      }
+      
+      reloadTimeoutRef.current = setTimeout(() => {
+        console.log('ステータス変更によりページをリロードします...');
+        window.location.reload();
+      }, 1500);
+    } else if (!lastStatus) {
+      // 初期化時に現在のステータスを保存
+      console.log(`初期ステータスを設定: ${status}`);
+      setLastStatus(status);
     }
-    
-    reloadTimeoutRef.current = setTimeout(() => {
-      console.log('ステータス変更によりページをリロードします...');
-      window.location.reload();
-    }, 1500);
     
     return () => {
       if (reloadTimeoutRef.current) {
@@ -155,6 +167,59 @@ export default function Home() {
       }
     };
   }, [status, lastStatus, isViewOnly, viewMode]);
+  
+  // Socket.IOでステータス変更イベントを監視
+  useEffect(() => {
+    if (!isViewOnly || viewMode !== 'full' || !socket || !connected) return;
+    
+    console.log('Socket.IOステータス監視を開始しました');
+    
+    // ステータス更新イベント
+    const handleStatusUpdate = (data: { status: string }) => {
+      console.log(`Socket.IOイベント受信: status:update`, data);
+      
+      if (data.status) {
+        console.log(`Socket.IOイベント: ステータス受信 - 現在:${data.status}, 前回:${lastStatus || 'なし'}`);
+        
+        if (!lastStatus || data.status !== lastStatus) {
+          console.log(`Socket.IOイベント: ステータスが変更されました: ${lastStatus || '初期化'} → ${data.status}`);
+          setLastStatus(data.status);
+          
+          // 連続リロードを防ぐため、少し遅延させてからリロード
+          if (reloadTimeoutRef.current) {
+            clearTimeout(reloadTimeoutRef.current);
+          }
+          
+          reloadTimeoutRef.current = setTimeout(() => {
+            console.log('ステータス変更によりページをリロードします...');
+            window.location.reload();
+          }, 1500);
+        }
+      }
+    };
+    
+    // 初期状態受信イベント
+    const handleInitialState = (data: { status?: string }) => {
+      console.log('Socket.IOイベント受信: state', data);
+      if (data.status) {
+        console.log(`初期状態受信: ステータス=${data.status}`);
+        setLastStatus(data.status);
+      }
+    };
+    
+    // イベントリスナー登録
+    socket.on('status:update', handleStatusUpdate);
+    socket.on('state', handleInitialState);
+    
+    // 接続時に現在の状態をリクエスト
+    socket.emit('get:state');
+    
+    return () => {
+      console.log('Socket.IOステータス監視を終了しました');
+      socket.off('status:update', handleStatusUpdate);
+      socket.off('state', handleInitialState);
+    };
+  }, [socket, connected, lastStatus, isViewOnly, viewMode]);
   
   // 全画面表示モードでのタイマー変更検知と自動リロード
   useEffect(() => {

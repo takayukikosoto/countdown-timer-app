@@ -245,9 +245,15 @@ export default function Dashboard() {
               </Link>
               <Link 
                 href="/admin/staff" 
-                className="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-4 rounded text-center block"
+                className="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-4 rounded text-center block mb-3"
               >
                 スタッフ管理
+              </Link>
+              <Link 
+                href="/admin/users" 
+                className="bg-teal-500 hover:bg-teal-600 text-white font-semibold py-2 px-4 rounded text-center block"
+              >
+                ユーザー管理
               </Link>
             </div>
 

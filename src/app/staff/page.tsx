@@ -7,8 +7,9 @@ import Link from 'next/link';
 import { useStatusData } from '@/hooks/useStatusData';
 import { useTimerData } from '@/hooks/useTimerData';
 import StatusDisplay from '@/components/StatusDisplay';
-import StaffControlPanel from '@/components/StaffControlPanel';
 import StaffStatusPanel from '@/components/StaffStatusPanel';
+import StaffQRCodeViewer from '@/components/StaffQRCodeViewer';
+import StaffHistoryPanel from '@/components/StaffHistoryPanel';
 import { useVisitorCount } from '@/hooks/useVisitorCount';
 import { useSocket } from '@/contexts/SocketContext';
 
@@ -16,6 +17,9 @@ export default function StaffPage() {
   const { user, isLoading, isAdmin, isStaff } = useAuth();
   const router = useRouter();
   const [staffName, setStaffName] = useState<string>('');
+  const [staffCompany, setStaffCompany] = useState<string>('');
+  const [staffPosition, setStaffPosition] = useState<string>('');
+  const [staffLevel, setStaffLevel] = useState<string>('');
   const { status, updateStatus } = useStatusData();
   const { currentTimer } = useTimerData();
   const { count: visitorCount } = useVisitorCount();
@@ -36,8 +40,11 @@ export default function StaffPage() {
           const response = await fetch('/api/staff/info');
           if (response.ok) {
             const data = await response.json();
-            // display_nameを使用
+            // スタッフ情報を設定
             setStaffName(data.display_name || user.user_metadata?.name || '');
+            setStaffCompany(data.company || '');
+            setStaffPosition(data.staff_position || '');
+            setStaffLevel(data.staff_level || '');
           } else {
             // フォールバックとしてuser_metadataの名前を使用
             setStaffName(user.user_metadata?.name || '');
@@ -100,6 +107,36 @@ export default function StaffPage() {
         )}
       </div>
       
+      {/* スタッフ情報カード */}
+      <div className="mb-6 rounded-lg bg-white p-6 shadow-md">
+        <h2 className="mb-4 text-xl font-semibold">スタッフ情報</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <p className="text-sm text-gray-500">名前</p>
+            <p className="font-medium">{staffName || '-'}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-500">所属</p>
+            <p className="font-medium">{staffCompany || '-'}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-500">ポジション</p>
+            <p className="font-medium">{staffPosition || '-'}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-500">レベル</p>
+            <p className="font-medium">{staffLevel || '-'}</p>
+          </div>
+        </div>
+        
+        {/* QRコード表示セクション */}
+        <div className="mt-4 pt-4 border-t border-gray-200">
+          <h3 className="mb-2 text-lg font-medium">ログインQRコード</h3>
+          <p className="text-sm text-gray-600 mb-2">このQRコードを使って素早くログインできます</p>
+          <StaffQRCodeViewer displayName={staffName} />
+        </div>
+      </div>
+      
       <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2">
         <div className="rounded-lg bg-white p-6 shadow-md">
           <h2 className="mb-4 text-xl font-semibold">現在のステータス</h2>
@@ -122,12 +159,13 @@ export default function StaffPage() {
         </div>
         
         <div className="rounded-lg bg-white p-6 shadow-md">
-          <h2 className="mb-4 text-xl font-semibold">イベント操作パネル</h2>
-          <StaffControlPanel 
-            currentStatus={status} 
-            onStatusChange={updateStatus} 
-            attendeeCount={attendeeCount}
-          />
+          <h2 className="mb-4 text-xl font-semibold">来場者数</h2>
+          <div className="text-3xl font-bold mb-2">{attendeeCount}人</div>
+          <p className="text-sm text-gray-500">現在の来場者数です</p>
+        </div>
+        
+        <div className="rounded-lg bg-white p-6 shadow-md">
+          <StaffHistoryPanel />
         </div>
       </div>
       
