@@ -31,19 +31,14 @@ export default function Dashboard() {
     if (!loading) {
       if (!user) {
         console.log('ユーザーがログインしていません。ログインページにリダイレクトします');
-        // リダイレクトを確実に行うために両方の方法を使用
-        router.push('/login');
-        setTimeout(() => {
-          if (!user) window.location.href = '/login';
-        }, 100);
+        router.replace('/login');
+        return;
       } else if (!isAdmin) {
         // ユーザーはログインしているが管理者権限がない場合
         console.log('管理者権限がありません');
         alert('管理者権限がありません');
-        router.push('/');
-        setTimeout(() => {
-          window.location.href = '/';
-        }, 100);
+        router.replace('/');
+        return;
       } else {
         console.log('管理者としてダッシュボードにアクセスしています');
       }

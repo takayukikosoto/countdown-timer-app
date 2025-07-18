@@ -141,8 +141,15 @@ export default function Home() {
     
     console.log(`現在のステータス: ${status}, 前回のステータス: ${lastStatus || 'なし'}`);
     
+    // 初期化時に現在のステータスを保存（一度だけ）
+    if (!lastStatus) {
+      console.log(`初期ステータスを設定: ${status}`);
+      setLastStatus(status);
+      return;
+    }
+    
     // ステータスが変更された場合のみ処理
-    if (lastStatus && status !== lastStatus) {
+    if (status !== lastStatus) {
       console.log(`ステータスが変更されました: ${lastStatus} → ${status}`);
       setLastStatus(status);
       
@@ -155,10 +162,6 @@ export default function Home() {
         console.log('ステータス変更によりページをリロードします...');
         window.location.reload();
       }, 1500);
-    } else if (!lastStatus) {
-      // 初期化時に現在のステータスを保存
-      console.log(`初期ステータスを設定: ${status}`);
-      setLastStatus(status);
     }
     
     return () => {

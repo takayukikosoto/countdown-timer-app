@@ -35,27 +35,6 @@ export async function POST(req: NextRequest) {
     }
 
     // --------------------------------------------------------------
-    //  dev fallback user (for local development only)
-    // --------------------------------------------------------------
-    if (
-      DEBUG &&
-      ((username === 'admin' && password === 'admin123') || (username === 'staff' && password === 'staff456'))
-    ) {
-      const role = username === 'admin' ? 'admin' : 'staff';
-      const token = jwt.sign(
-        {
-          user_id: username,
-          username,
-          role,
-          exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24, // 24h
-        },
-        JWT_SECRET
-      );
-
-      return buildResponse(token, { id: username, username, role });
-    }
-
-    // --------------------------------------------------------------
     //  call Supabase RPC for real authentication
     // --------------------------------------------------------------
     const { data, error } = await supabase.rpc('check_user_password', { p_username: username, p_password: password });

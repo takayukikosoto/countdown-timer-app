@@ -117,7 +117,7 @@ export async function checkAuthStatus(): Promise<AuthSession | null> {
 export async function loginWithAccessCode(accessCode: string) {
   // テスト用の固定アクセスコード
   const validAccessCodes = {
-    'admin123': 'admin',
+
     'staff456': 'staff'
   };
   

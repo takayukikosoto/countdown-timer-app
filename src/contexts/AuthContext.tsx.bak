@@ -1,0 +1,456 @@
+'use client';
+
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { AuthSession } from '@/lib/supabase';
+
+// 認証コンテキストの型定義
+export type AuthContextType = {
+  session: AuthSession | null;
+  user: AuthSession['user'] | null;
+  loading: boolean;
+  isLoading: boolean; // isLoadingはloadingと同じ値（互換性のため）
+  isAdmin: boolean;
+  isStaff: boolean;
+  // 追加ロール判定
+  isAgency: boolean;
+  isAttendee: boolean;
+  isOrganizer: boolean;
+  isProduction: boolean;
+  isPlatinumSponsor: boolean;
+  isGoldSponsor: boolean;
+  isVipAttendee: boolean;
+  userRole: string | null;
+  login: (username: string, password: string) => Promise<{ success: boolean; message?: string }>;
+  logout: () => Promise<boolean>;
+};
+
+// デフォルト値
+const defaultAuthContext: AuthContextType = {
+  session: null,
+  user: null,
+  loading: true,
+  isLoading: true,
+  isAdmin: false,
+  isStaff: false,
+  isAgency: false,
+  isAttendee: false,
+  isOrganizer: false,
+  isProduction: false,
+  isPlatinumSponsor: false,
+  isGoldSponsor: false,
+  isVipAttendee: false,
+  userRole: null,
+  login: async () => ({ success: false }),
+  logout: async () => false,
+};
+
+// コンテキストの作成
+const AuthContext = createContext<AuthContextType>(defaultAuthContext);
+
+// AuthProviderの型定義
+type AuthProviderProps = {
+  children: ReactNode;
+};
+
+// AuthProviderコンポーネント
+export function AuthProvider({ children }: AuthProviderProps) {
+  const [session, setSession] = useState<AuthSession | null>(null);
+  const [user, setUser] = useState<AuthSession['user'] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isStaff, setIsStaff] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  // 初期認証状態の確認
+  useEffect(() => {
+    async function getInitialSession() {
+      try {
+        console.log('初期認証状態を確認中...');
+        // ローカルストレージからセッションを取得
+        const storedSession = localStorage.getItem('auth_session');
+        
+        if (storedSession) {
+          const session = JSON.parse(storedSession) as AuthSession;
+          console.log('ローカルストレージから取得したセッション:', session);
+          
+          // トークンの有効期限をチェック
+          const tokenData = parseJwt(session.access_token);
+          const isTokenExpired = tokenData.exp * 1000 < Date.now();
+          
+          if (isTokenExpired) {
+            console.log('トークンの有効期限が切れています。ログアウトします。');
+            // ローカルストレージからセッションを削除
+            localStorage.removeItem('auth_session');
+            // クッキーからトークンを削除
+            document.cookie = 'auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict;';
+            // 状態をリセット
+            setSession(null);
+            setUser(null);
+            setIsAdmin(false);
+            setIsStaff(false);
+            setUserRole(null);
+            
+            // 現在のパスが保護されたルートであれば、ログインページにリダイレクト
+            const protectedRoutes = ['/dashboard', '/admin', '/staff'];
+            const currentPath = window.location.pathname;
+            if (protectedRoutes.some(route => currentPath.startsWith(route))) {
+              console.log('保護されたルートからログインページにリダイレクトします');
+              window.location.href = '/login';
+            }
+          } else {
+            setSession(session);
+            setUser(session?.user || null);
+            
+            // ユーザーロールと権限の確認
+            const role = session?.user?.user_metadata?.role;
+            const hasAdminRole = role === 'admin';
+            const hasStaffRole = role === 'staff' || role === 'admin'; // 管理者はスタッフ権限も持つ
+            console.log('ユーザーロール:', role, '管理者権限:', hasAdminRole, 'スタッフ権限:', hasStaffRole);
+            setIsAdmin(hasAdminRole);
+            setIsStaff(hasStaffRole);
+            setUserRole(role || null);
+          }
+        } else {
+          console.log('セッションが見つかりませんでした');
+        }
+      } catch (error) {
+        console.error('初期認証状態の確認中にエラーが発生しました:', error);
+        localStorage.removeItem('auth_session');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    getInitialSession();
+  }, []);
+  
+  // JWTトークンをデコードする関数
+  function parseJwt(token: string) {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+      return JSON.parse(jsonPayload);
+    } catch (error) {
+      console.error('JWTトークンのパースに失敗しました:', error);
+      return { exp: 0 };
+    }
+  }
+
+  // ログイン関数
+  const handleLogin = async (username: string, password: string) => {
+    try {
+      console.log('ログイン処理を開始します:', { username });
+      
+      // テスト環境ではデフォルトユーザーのハードコードログインを許可
+      if ((username === 'admin' && password === 'admin123') || 
+          (username === 'staff' && password === 'staff456')) {
+        console.log('デフォルトユーザーを検出しました。クライアント側で直接ログインします。');
+        
+        // ユーザーロールを設定
+        const role = username === 'admin' ? 'admin' : 'staff';
+        const userId = username === 'admin' ? '1' : '2';
+        
+        // 簡易トークンを生成
+        const token = `mock-token-${Date.now()}-${role}`;
+        
+        // セッション情報を作成
+        const session: AuthSession = {
+          user: {
+            id: userId,
+            user_metadata: {
+              name: username,
+              role: role
+            }
+          },
+          access_token: token
+        };
+        
+        // セッションを保存
+        localStorage.setItem('auth_session', JSON.stringify(session));
+        
+        // クッキーにトークンを保存
+        document.cookie = `auth_token=${token}; path=/; max-age=${60 * 60 * 24}; SameSite=Strict;`;
+        
+        // 状態を更新
+        setSession(session);
+        setUser(session.user);
+        setIsAdmin(role === 'admin');
+        setIsStaff(role === 'staff' || role === 'admin');
+        setUserRole(role);
+        
+        console.log('クライアント側ログイン成功:', { role, userId });
+        
+        // リダイレクト
+        setTimeout(() => {
+          if (window.location.pathname === '/login') {
+            const redirectPath = role === 'admin' ? '/dashboard' : '/staff';
+            console.log(`リダイレクト先: ${redirectPath}`);
+            // Next.jsのクライアントサイドナビゲーションを使用
+            // window.location.hrefの代わりにrouter.pushを使うべきだが
+            // このコンポーネントではuseRouterが使えないため
+            // リダイレクトの方法を変更
+            try {
+              // URLを変更するが、ページの再読み込みはしない
+              window.history.pushState({}, '', redirectPath);
+              // カスタムイベントをディスパッチしてルーティング変更を通知
+              window.dispatchEvent(new Event('popstate'));
+            } catch (e) {
+              console.error('ナビゲーションエラー:', e);
+              // フォールバックとして従来の方法を使用
+              window.location.href = redirectPath;
+            }
+          }
+        }, 1000);
+        
+        return { success: true };
+      }
+      
+      // 通常のログイン処理（API呼び出し）
+      console.log('通常のログイン処理を実行します');
+      
+      // 現在のホスト名とポートを取得して API URL を構築
+      const apiUrl = `${window.location.origin}/api/auth/login`;
+      console.log('API URL:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include', // クッキーを含める
+        body: JSON.stringify({ username, password }),
+      });
+      
+      console.log('レスポンスステータス:', response.status, response.statusText);
+      
+      const data = await response.json();
+      console.log('レスポンスデータ:', data);
+      
+      if (!response.ok) {
+        console.error('ログインに失敗しました:', data.error);
+        return { success: false, message: data.error || 'ログインに失敗しました' };
+      }
+      
+      console.log('ログイン成功:', data);
+      
+      // セッション情報を保存
+      const session = data.session as AuthSession;
+      localStorage.setItem('auth_session', JSON.stringify(session));
+      
+      // クッキーにトークンを保存
+      document.cookie = `auth_token=${session.access_token}; path=/; max-age=${60 * 60 * 24}; SameSite=Strict;`;
+      
+      setSession(session);
+      setUser(session.user);
+      
+      // ユーザーロールを確認
+      const role = session.user.user_metadata?.role;
+      console.log('ユーザーロール:', role);
+      setIsAdmin(role === 'admin');
+      setIsStaff(role === 'staff' || role === 'admin');
+      setUserRole(role || null);
+      
+      // ログイン成功時のみダッシュボードにリダイレクト
+      setTimeout(() => {
+        if (window.location.pathname === '/login') {
+          const redirectPath = role === 'admin' ? '/dashboard' : '/staff';
+          console.log(`リダイレクト先: ${redirectPath}`);
+          try {
+            // URLを変更するが、ページの再読み込みはしない
+            window.history.pushState({}, '', redirectPath);
+            // カスタムイベントをディスパッチしてルーティング変更を通知
+            window.dispatchEvent(new Event('popstate'));
+          } catch (e) {
+            console.error('ナビゲーションエラー:', e);
+            // フォールバックとして従来の方法を使用
+            window.location.href = redirectPath;
+          }
+        }
+      }, 1000);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('ログイン処理中にエラーが発生しました:', error);
+      return { success: false, message: 'ログイン処理中にエラーが発生しました' };
+    }
+
+// ログイン関数
+const handleLogin = async (username: string, password: string) => {
+try {
+  console.log('ログイン処理を開始します:', { username });
+  // テスト環境ではデフォルトユーザーのハードコードログインを許可
+  if ((username === 'admin' && password === 'admin123') || 
+      (username === 'staff' && password === 'staff456')) {
+    console.log('デフォルトユーザーを検出しました。クライアント側で直接ログインします。');
+    // ユーザーロールを設定
+    const role = username === 'admin' ? 'admin' : 'staff';
+    const userId = username === 'admin' ? '1' : '2';
+    // 簡易トークンを生成
+    const token = `mock-token-${Date.now()}-${role}`;
+    // セッション情報を作成
+    const session: AuthSession = {
+      user: {
+        id: userId,
+        user_metadata: {
+          name: username,
+          role: role
+        }
+      },
+      access_token: token
+    };
+    // セッションを保存
+    localStorage.setItem('auth_session', JSON.stringify(session));
+    // クッキーにトークンを保存
+    document.cookie = `auth_token=${token}; path=/; max-age=${60 * 60 * 24}; SameSite=Strict;`;
+    // 状態を更新
+    setSession(session);
+    setUser(session.user);
+    setIsAdmin(role === 'admin');
+    setIsStaff(role === 'staff' || role === 'admin');
+    setUserRole(role);
+    console.log('クライアント側ログイン成功:', { role, userId });
+    // リダイレクト
+    setTimeout(() => {
+      if (window.location.pathname === '/login') {
+        const redirectPath = role === 'admin' ? '/dashboard' : '/staff';
+        console.log(`リダイレクト先: ${redirectPath}`);
+        try {
+          // URLを変更するが、ページの再読み込みはしない
+          window.history.pushState({}, '', redirectPath);
+          // カスタムイベントをディスパッチしてルーティング変更を通知
+          window.dispatchEvent(new Event('popstate'));
+        } catch (e) {
+          console.error('ナビゲーションエラー:', e);
+          // フォールバックとして従来の方法を使用
+          window.location.href = redirectPath;
+        }
+      }
+    }, 1000);
+    return { success: true };
+  }
+  // 通常のログイン処理（API呼び出し）
+  console.log('通常のログイン処理を実行します');
+  // 現在のホスト名とポートを取得して API URL を構築
+  const apiUrl = `${window.location.origin}/api/auth/login`;
+  console.log('API URL:', apiUrl);
+  const response = await fetch(apiUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include', // クッキーを含める
+    body: JSON.stringify({ username, password }),
+  });
+  console.log('レスポンスステータス:', response.status, response.statusText);
+  const data = await response.json();
+  console.log('レスポンスデータ:', data);
+  if (!response.ok) {
+    console.error('ログインに失敗しました:', data.error);
+    return { success: false, message: data.error || 'ログインに失敗しました' };
+  }
+  console.log('ログイン成功:', data);
+  // セッション情報を保存
+  const session = data.session as AuthSession;
+  localStorage.setItem('auth_session', JSON.stringify(session));
+  // クッキーにトークンを保存
+  document.cookie = `auth_token=${session.access_token}; path=/; max-age=${60 * 60 * 24}; SameSite=Strict;`;
+  setSession(session);
+  setUser(session.user);
+  // ユーザーロールを確認
+  const role = session.user.user_metadata?.role;
+  console.log('ユーザーロール:', role);
+  setIsAdmin(role === 'admin');
+  setIsStaff(role === 'staff' || role === 'admin');
+  setUserRole(role || null);
+  // ログイン成功時のみダッシュボードにリダイレクト
+  setTimeout(() => {
+    if (window.location.pathname === '/login') {
+      const redirectPath = role === 'admin' ? '/dashboard' : '/staff';
+      console.log(`リダイレクト先: ${redirectPath}`);
+      try {
+        // URLを変更するが、ページの再読み込みはしない
+        window.history.pushState({}, '', redirectPath);
+        // カスタムイベントをディスパッチしてルーティング変更を通知
+        window.dispatchEvent(new Event('popstate'));
+      } catch (e) {
+        console.error('ナビゲーションエラー:', e);
+        // フォールバックとして従来の方法を使用
+        window.location.href = redirectPath;
+      }
+    }
+  }, 1000);
+  return { success: true };
+} catch (error) {
+  console.error('ログイン処理中にエラーが発生しました:', error);
+  return { success: false, message: 'ログイン処理中にエラーが発生しました' };
+}
+};
+
+// ログアウト関数
+const handleLogout = async () => {
+try {
+  console.log('ログアウト処理を開始します');
+  // ローカルストレージからセッションを削除
+  localStorage.removeItem('auth_session');
+  // クッキーからトークンを削除
+  document.cookie = 'auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict;';
+  // APIを使用してサーバー側のセッションもクリア
+  try {
+    const response = await fetch('/api/auth/logout', {
+      method: 'POST',
+      credentials: 'include',
+    });
+    console.log('ログアウトAPIレスポンス:', response.status);
+  } catch (apiError) {
+    // APIエラーは無視してログアウトを続行
+    console.warn('ログアウトAPI呼び出し中にエラーが発生しました:', apiError);
+  }
+  // 状態をリセット
+  setSession(null);
+  setUser(null);
+  setIsAdmin(false);
+  setIsStaff(false);
+  setUserRole(null);
+  console.log('ログアウト成功');
+  // ログインページにリダイレクト
+  window.location.href = '/login';
+  return { success: true };
+} catch (error) {
+  console.error('ログアウト処理中にエラーが発生しました:', error);
+  return { success: false, message: 'ログアウト処理中にエラーが発生しました' };
+}
+};
+  const isAttendee = userRole === 'attendee';
+  const isOrganizer = userRole === 'organizer';
+  const isProduction = userRole === 'production';
+  const isPlatinumSponsor = userRole === 'platinum_sponsor';
+  const isGoldSponsor = userRole === 'gold_sponsor';
+  const isVipAttendee = userRole === 'vip';
+
+  const value = {
+    session,
+    user,
+    loading,
+    isLoading: loading, // isLoadingとloadingを同期
+    isAdmin,
+    isStaff,
+    isAgency,
+    isAttendee,
+    isOrganizer,
+    isProduction,
+    isPlatinumSponsor,
+    isGoldSponsor,
+    isVipAttendee,
+    userRole,
+    login: handleLogin,
+    logout: handleLogout,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+// 認証コンテキストを使用するためのフック
+export const useAuth = () => useContext(AuthContext);

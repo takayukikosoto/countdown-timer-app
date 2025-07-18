@@ -1,0 +1,119 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+import bcrypt from 'bcryptjs';
+
+// Supabaseクライアントの初期化
+// 環境変数が設定されていない場合はローカル開発環境用の値を使用
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://localhost:54321';
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU';
+
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+// デバッグモードの設定
+const DEBUG_MODE = process.env.NODE_ENV === 'development' || process.env.DEBUG_AUTH === 'true';
+
+export async function POST(request: NextRequest) {
+  try {
+    // 開発環境でのみ実行可能
+    if (!DEBUG_MODE) {
+      return NextResponse.json(
+        { error: 'このエンドポイントは開発環境でのみ利用可能です' },
+        { status: 403 }
+      );
+    }
+
+    console.log('===== テストユーザー登録APIが呼び出されました =====');
+    
+    // リクエストボディからユーザー情報を取得
+    const body = await request.json();
+    const { username, password, role = 'staff' } = body;
+    
+    console.log('受信したリクエスト:', { 
+      username, 
+      passwordLength: password ? password.length : 0,
+      role
+    });
+
+    // 入力検証
+    if (!username || !password) {
+      console.log('入力検証エラー: ユーザー名またはパスワードが空です');
+      return NextResponse.json(
+        { error: 'ユーザー名とパスワードは必須です' },
+        { status: 400 }
+      );
+    }
+
+    // ユーザー名の重複チェック
+    const { data: existingUser, error: checkError } = await supabase
+      .from('admin_users')
+      .select('id')
+      .eq('username', username)
+      .single();
+
+    if (checkError && checkError.code !== 'PGRST116') {
+      console.error('ユーザー重複チェックエラー:', checkError);
+      return NextResponse.json(
+        { error: 'ユーザー情報の確認中にエラーが発生しました' },
+        { status: 500 }
+      );
+    }
+
+    if (existingUser) {
+      console.log('既存ユーザーが見つかりました:', existingUser);
+      return NextResponse.json(
+        { error: 'このユーザー名は既に使用されています' },
+        { status: 409 }
+      );
+    }
+
+    // bcryptを使用してパスワードハッシュを生成
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+    
+    console.log('パスワードハッシュを生成しました:', {
+      originalPassword: password,
+      hashedPassword: hashedPassword.substring(0, 20) + '...',
+      salt: salt
+    });
+    
+    // ユーザーを直接データベースに挿入
+    // admin_usersテーブルの構造に合わせてフィールドを設定
+    const { data, error } = await supabase
+      .from('admin_users')
+      .insert([
+        { 
+          username: username, 
+          password_hash: hashedPassword,
+          role: role
+        }
+      ])
+      .select();
+    
+    if (error) {
+      console.error('ユーザー登録エラー:', error);
+      return NextResponse.json(
+        { error: `ユーザー登録に失敗しました: ${error.message}` },
+        { status: 500 }
+      );
+    }
+    
+    console.log('ユーザー登録成功:', data);
+
+    console.log('ユーザー登録成功:', { username, role });
+    
+    return NextResponse.json({
+      success: true,
+      user: {
+        username,
+        role
+      }
+    });
+
+  } catch (error) {
+    console.error('ユーザー登録エラー:', error);
+    return NextResponse.json(
+      { error: 'サーバーエラーが発生しました' },
+      { status: 500 }
+    );
+  }
+}

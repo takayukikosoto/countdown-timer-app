@@ -1,0 +1,391 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+import jwt from 'jsonwebtoken';
+import { createClient } from '@supabase/supabase-js';
+
+
+
+// ================================================================
+// シンプル版 Login API
+//  1. check_user_password RPC (PostgreSQL) で認証 + JWT 生成
+//  2. Node 側は結果を検証して Cookie / JSON を返すだけ
+//  3. DEV 環境では admin / staff のデフォルトユーザーを許可
+// ================================================================
+
+// JWTシークレットキー
+const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-jwt-token-with-at-least-32-characters-long';
+
+// Supabaseクライアントの初期化
+// 環境変数が設定されていない場合はローカル開発環境用の値を使用
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://localhost:54321';
+// 認証には service_role キーが必須 (RLS を無視してパスワードハッシュへアクセスするため)
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
+if (!supabaseKey) {
+  throw new Error('SUPABASE_SERVICE_ROLE_KEY が設定されていません');
+}
+
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+// デバッグモードの設定
+const DEBUG_MODE = process.env.NODE_ENV !== 'production';
+
+export async function POST(request: NextRequest) {
+  try {
+    // -------------------------------------------------------------
+    // 1. 入力取得 & バリデーション
+    // -------------------------------------------------------------
+  try {
+    console.log('[login] called');
+    
+    // リクエストボディからユーザー名とパスワードを取得
+    const body = await request.json();
+    const { username, password } = body;
+    
+    console.log('受信したリクエスト:', { 
+      username, 
+      passwordLength: password ? password.length : 0,
+      headers: Object.fromEntries(request.headers.entries())
+    });
+
+    // 入力検証
+    if (!username || !password) {
+      console.log('入力検証エラー: ユーザー名またはパスワードが空です');
+      return NextResponse.json(
+        { error: 'ユーザー名とパスワードは必須です' },
+        { status: 400 }
+      );
+    }
+
+    
+    
+    // テストモード判定（開発環境または明示的にデバッグモードが有効な場合）
+    const isTestMode = process.env.NODE_ENV === 'development' || process.env.DEBUG_AUTH === 'true';
+    
+    // -------------------------------------------------------------
+    // 2. DEV モードのハードコードユーザー
+    // -------------------------------------------------------------
+    if (DEBUG_MODE && ((username === 'admin' && password === 'admin123') ||
+        (username === 'staff' && password === 'staff456'))) {
+      console.log('[login] dev fallback user');
+      
+      // ユーザーロールを設定
+      const role = username === 'admin' ? 'admin' : 'staff';
+      
+      // JWTトークンを生成
+      const token = jwt.sign(
+        {
+          user_id: username === 'admin' ? '1' : '2',
+          username: username,
+          role: role,
+          exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60) // 24時間有効
+        },
+        JWT_SECRET
+      );
+      
+      // レスポンスを作成
+      const response = NextResponse.json({
+        session: {
+          user: {
+            id: username === 'admin' ? '1' : '2',
+            user_metadata: {
+              name: username,
+              role: role
+            }
+          },
+          access_token: token
+        },
+        user: {
+          id: username === 'admin' ? '1' : '2',
+          username: username,
+          role: role
+        }
+      });
+      
+      // クッキーにトークンを設定
+      response.cookies.set({
+        name: 'auth_token',
+        value: token,
+        path: '/',
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 60 * 60 * 24, // 24時間
+        sameSite: 'strict'
+      });
+      
+      console.log('[login] dev login success');
+      return response;
+    }
+    
+    console.log('[login] call check_user_password RPC');
+    
+    // -------------------------------------------------------------
+    // 3. Supabase RPC で認証 & JWT 取得
+    // -------------------------------------------------------------
+    try {
+      const { error: healthError } = await supabase
+        .from('admin_users')
+        .select('id')
+        .limit(1);
+        
+      console.log('Supabase接続確認:', { 
+        connected: !healthError, 
+        error: healthError ? healthError.message : null 
+      });
+    } catch (healthCheckError) {
+      console.error('Supabase接続確認中にエラーが発生しました:', healthCheckError);
+    }
+    
+    // ユーザー情報を取得
+    const { data: rpcData, error: rpcError } = await supabase.rpc('check_user_password', {
+      username,
+      password,
+    });
+
+    if (rpcError) {
+      console.error('[login] RPC error', rpcError.message);
+      return NextResponse.json({ error: 'サーバーエラーが発生しました' }, { status: 500 });
+    }
+
+    if (!rpcData || rpcData.length === 0) {
+      return NextResponse.json({ error: 'ユーザー名またはパスワードが正しくありません' }, { status: 401 });
+    }
+
+    const user = rpcData[0];
+    const token = user.token as string;
+      .select('id, username, password_hash, role')
+      .eq('username', username)
+      .limit(1);
+
+    console.log('ユーザー取得結果:', { 
+      found: users && users.length > 0,
+      userCount: users?.length || 0,
+      error: userError ? userError.message : null,
+      userDetails: users && users.length > 0 ? {
+        id: users[0].id,
+        username: users[0].username,
+        role: users[0].role,
+        hasPasswordHash: !!users[0].password_hash,
+        hashType: users[0].password_hash ? (users[0].password_hash.startsWith('$2') ? 'bcrypt' : 'unknown') : 'none'
+      } : null
+    });
+    
+    let user: any = users && users.length > 0 ? users[0] : null;
+
+    // ユーザーが見つからなかった場合は RPC でパスワードを検証しつつユーザー情報を取得
+    if (!user) {
+      console.log('ユーザーが見つかりません。check_user_password RPC を試行します');
+      const { data: rpcResult, error: rpcError } = await supabase.rpc('check_user_password', {
+        username,
+        password,
+      });
+
+      if (rpcError) {
+        console.error('check_user_password RPC エラー:', rpcError);
+      }
+
+      if (rpcResult && rpcResult.length > 0) {
+        console.log('RPC によりユーザー認証成功:', rpcResult[0]);
+        user = rpcResult[0];
+      } else {
+        console.log('RPC でもユーザー認証失敗');
+        return NextResponse.json(
+          { error: 'ユーザー名またはパスワードが正しくありません' },
+          { status: 401 }
+        );
+      }
+    }
+    
+    // user 変数は上で取得済み
+    console.log('ユーザー情報を取得しました:', { 
+      id: user.id, 
+      username: user.username, 
+      role: user.role 
+    });
+    
+    // パスワードの検証
+    console.log('パスワードハッシュの形式を確認:', {
+      hash: user.password_hash ? `${user.password_hash.substring(0, 10)}...` : 'なし',
+      length: user.password_hash?.length || 0,
+      prefix: user.password_hash?.substring(0, 3) || '',
+      isBcrypt: user.password_hash?.startsWith('$2') || false
+    });
+    
+    // パスワード検証の実行
+    let isPasswordValid = false;
+    
+    // デバッグモードでデフォルトユーザーの場合は常に成功
+    if (DEBUG_MODE && ((username === 'admin' && password === 'admin123') || 
+                      (username === 'staff' && password === 'staff456'))) {
+      console.log('デバッグモード: デフォルトユーザーのパスワード検証をスキップします');
+      isPasswordValid = true;
+    } else {
+      try {
+        // 方法1: 直接bcryptで比較（最も信頼性の高い方法）
+        console.log('方法1: bcryptjsによる直接ハッシュ比較を試みます');
+        console.log('パスワード検証情報:', {
+          username: username,
+          inputPasswordLength: password.length,
+          storedHashPrefix: user.password_hash ? user.password_hash.substring(0, 10) : 'null',
+          hashType: user.password_hash ? (user.password_hash.startsWith('$2') ? 'bcrypt' : 'unknown') : 'null'
+        });
+        
+        // bcryptハッシュの場合
+        if (user.password_hash && user.password_hash.startsWith('$2')) {
+          try {
+            // 非同期で比較してより確実に検証
+            const isMatch = await bcrypt.compare(password, user.password_hash);
+            console.log('bcryptによるハッシュ比較結果:', isMatch);
+            if (isMatch) {
+              isPasswordValid = true;
+              console.log('bcryptによるパスワード検証に成功しました');
+            } else {
+              // 失敗した場合は同期的にも試す
+              const syncMatch = bcrypt.compareSync(password, user.password_hash);
+              console.log('同期的bcrypt比較結果:', syncMatch);
+              if (syncMatch) {
+                isPasswordValid = true;
+                console.log('同期的bcryptによる検証に成功しました');
+              }
+            }
+          } catch (bcryptError) {
+            console.error('bcryptによるハッシュ比較エラー:', bcryptError);
+          }
+        } else {
+          console.log('パスワードハッシュがbcrypt形式ではありません、別の検証方法を試みます');
+        }
+        
+        // 方法2: verify_password RPC関数を使用（まだ検証に失敗している場合）
+        if (!isPasswordValid) {
+          console.log('方法2: verify_password RPC関数を使用します');
+          const { data: verifyResult, error: verifyError } = await supabase.rpc(
+            'verify_password',
+            { password: password, hash: user.password_hash }
+          );
+          
+          if (!verifyError && verifyResult === true) {
+            console.log('verify_password関数によるパスワード検証に成功しました');
+            isPasswordValid = true;
+          } else {
+            console.log('verify_password関数による検証結果:', { 
+              result: verifyResult, 
+              error: verifyError?.message || null 
+            });
+          }
+        }
+        
+        // 方法3: check_user_password RPC関数を使用（まだ検証に失敗している場合）
+        if (!isPasswordValid) {
+          console.log('方法3: check_user_password RPC関数を使用します');
+          const { data: checkResult, error: checkError } = await supabase.rpc(
+            'check_user_password',
+            { username: username, password: password }
+          );
+          
+          if (!checkError && checkResult && checkResult.length > 0) {
+            console.log('check_user_password関数によるパスワード検証に成功しました');
+            isPasswordValid = true;
+          } else {
+            console.log('check_user_password関数による検証結果:', { 
+              result: checkResult, 
+              error: checkError?.message || null 
+            });
+          }
+        }
+        
+        // 方法4: 緊急フォールバック - デバッグモードでのみ有効
+        if (!isPasswordValid && DEBUG_MODE) {
+          // デバッグモードでは、特定のユーザー名/パスワードの組み合わせを許可
+          if ((username === 'admin' && password === 'admin123') || 
+              (username === 'staff' && password === 'staff456')) {
+            console.log('デバッグモード: フォールバックによるパスワード検証に成功しました');
+            isPasswordValid = true;
+          }
+        }
+      } catch (error) {
+        console.error('パスワード検証中にエラーが発生しました:', error);
+      }
+    }
+    
+    // パスワード検証の結果を確認
+    if (!isPasswordValid) {
+      console.log('すべてのパスワード検証方法が失敗しました');
+      return NextResponse.json(
+        { error: 'ユーザー名またはパスワードが正しくありません' },
+        { status: 401 }
+      );
+    }
+      user_id: user.id,
+      username: user.username,
+      role: user.role,
+      exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
+    };
+    const token = jwt.sign(tokenPayload, JWT_SECRET);
+    */
+      user_id: user.id,
+      username: user.username,
+      role: user.role,
+      exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60) // 24時間有効
+    };
+    
+    console.log('JWTトークンペイロード:', tokenPayload);
+    
+    
+    
+    console.log('JWTトークン生成完了:', { 
+      tokenLength: token.length,
+      tokenPrefix: token.substring(0, 20) + '...' 
+    });
+
+    // セッション情報を作成
+    const const session = {
+      user: {
+        id: user.id,
+        user_metadata: {
+          name: user.username,
+          role: user.role,
+        },
+      },
+      access_token: token,
+    };
+      user: {
+        id: user.id,
+        user_metadata: {
+          name: user.username,
+          role: user.role
+        }
+      },
+      access_token: token
+    };
+
+    // クッキーを設定したレスポンスを作成
+    const response = NextResponse.json({
+      session,
+      user: {
+        id: user.id,
+        username: user.username,
+        role: user.role
+      }
+    });
+    
+    // クッキーにトークンを設定
+    response.cookies.set({
+      name: 'auth_token',
+      value: token,
+      path: '/',
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 60 * 60 * 24, // 24時間
+      sameSite: 'strict'
+    });
+    
+    console.log('ログイン成功: レスポンスを返します');
+    return response;
+
+  } catch (error) {
+    console.error('ログインエラー:', error);
+    return NextResponse.json(
+      { error: 'サーバーエラーが発生しました' },
+      { status: 500 }
+    );
+  }
+}

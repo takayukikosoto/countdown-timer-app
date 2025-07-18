@@ -16,6 +16,8 @@ interface UserData {
   role: UserRole;
   created_at: string;
   company?: string;
+  position?: string;
+  level?: string;
   updated_at?: string;
 }
 
@@ -49,6 +51,8 @@ export default function UserManagementPage() {
     name: string;
     role: string;
     company?: string;
+    position?: string;
+    level?: string;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   
@@ -56,8 +60,17 @@ export default function UserManagementPage() {
   const [editingUser, setEditingUser] = useState<UserData | null>(null);
   const [editDisplayName, setEditDisplayName] = useState('');
   const [editCompany, setEditCompany] = useState('');
+  const [editPosition, setEditPosition] = useState('');
+  const [editLevel, setEditLevel] = useState('');
   const [editRole, setEditRole] = useState<UserRole>('attendee');
   const [isEditing, setIsEditing] = useState(false);
+  
+  // 勤怠履歴表示用の状態
+  const [activeAttendanceStaff, setActiveAttendanceStaff] = useState<string | null>(null);
+  const [staffHistory, setStaffHistory] = useState<any[]>([]);
+  const [staffHistoryName, setStaffHistoryName] = useState('');
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
 
   // 管理者権限チェック
   useEffect(() => {
@@ -72,6 +85,81 @@ export default function UserManagementPage() {
       fetchUsers();
     }
   }, [isAdmin]);
+  
+  // 日時のフォーマット（秒数あり）
+  const formatTimeWithSeconds = (dateString: string) => {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('ja-JP', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    }).format(date);
+  };
+  
+  // ステータスに応じた色を返す関数
+  const getStatusColor = (statusValue: string) => {
+    switch (statusValue) {
+      case '出発前': // 出発前
+        return 'text-gray-600';
+      case '出発OK': // 出発OK
+        return 'text-green-600';
+      case '到着': // 到着
+        return 'text-blue-600';
+      case '勤務中': // 勤務中
+        return 'text-indigo-600';
+      case '業務終了': // 業務終了
+        return 'text-purple-600';
+      case 'カスタム': // カスタム
+        return 'text-orange-600';
+      default:
+        return 'text-blue-600';
+    }
+  };
+  
+  // スタッフの勤怠履歴を取得する関数
+  const fetchStaffAttendance = async (staffId: string) => {
+    try {
+      setIsLoadingHistory(true);
+      setHistoryError(null);
+      setActiveAttendanceStaff(staffId);
+      
+      // 認証トークンを取得
+      const token = localStorage.getItem('auth_token');
+      
+      const response = await fetch(`/api/admin/staff-history?staffId=${staffId}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        credentials: 'include' // クッキーを送信
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || `勤怠履歴の取得に失敗しました (${response.status})`);
+      }
+      
+      setStaffHistory(data.history || []);
+      setStaffHistoryName(data.staff?.display_name || '');
+    } catch (err) {
+      console.error('勤怠履歴取得エラー:', err);
+      setHistoryError(err instanceof Error ? err.message : '勤怠履歴の取得に失敗しました');
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+  
+  // 勤怠履歴モーダルを閉じる関数
+  const closeAttendanceModal = () => {
+    setActiveAttendanceStaff(null);
+    setStaffHistory([]);
+    setStaffHistoryName('');
+    setHistoryError(null);
+  };
 
   // 注意: auth変数は既に上部で取得済み
   
@@ -142,10 +230,10 @@ export default function UserManagementPage() {
         },
         body: JSON.stringify({
           display_name: newUserName,
+          role: newUserRole,
           company: newUserCompany || undefined,
-          staff_position: newUserPosition || undefined,
-          staff_level: newUserLevel || undefined,
-          role: newUserRole
+          position: newUserPosition || undefined,
+          level: newUserLevel || undefined
         }),
       });
       
@@ -166,7 +254,9 @@ export default function UserManagementPage() {
           password: data.user.password,
           name: data.user.name,
           role: USER_ROLE_DISPLAY_NAMES[data.user.role as UserRole],
-          company: data.user.company
+          company: data.user.company,
+          position: data.user.position,
+          level: data.user.level
         });
         
         // フォームをリセット
@@ -236,6 +326,8 @@ export default function UserManagementPage() {
     setEditingUser(user);
     setEditDisplayName(user.display_name);
     setEditCompany(user.company || '');
+    setEditPosition(user.position || '');
+    setEditLevel(user.level || '');
     setEditRole(user.role);
   };
 
@@ -244,6 +336,8 @@ export default function UserManagementPage() {
     setEditingUser(null);
     setEditDisplayName('');
     setEditCompany('');
+    setEditPosition('');
+    setEditLevel('');
     setEditRole('attendee');
     setIsEditing(false);
   };
@@ -280,9 +374,11 @@ export default function UserManagementPage() {
         },
         body: JSON.stringify({
           display_name: editDisplayName,
+          role: editRole,
           company: editCompany || undefined,
-          role: editRole
-        }),
+          position: editPosition || undefined,
+          level: editLevel || undefined
+        })
       });
       
       if (!response.ok) {
@@ -310,43 +406,7 @@ export default function UserManagementPage() {
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
           {error}
         </div>
-      )}
-      
-      <Card className="p-6 mb-6">
-        <h2 className="text-xl font-semibold mb-4">新しいユーザーを作成</h2>
-        <form onSubmit={createUser}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">表示名</label>
-              <Input
-                type="text"
-                value={newUserName}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewUserName(e.target.value)}
-                placeholder="ユーザー名"
-                disabled={isCreating}
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">所属（任意）</label>
-              <Input
-                type="text"
-                value={newUserCompany}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewUserCompany(e.target.value)}
-                placeholder="例: 株式会社XXX"
-                disabled={isCreating}
-              />
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">ポジション（任意）</label>
-              <Input
-                type="text"
-                value={newUserPosition}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewUserPosition(e.target.value)}
-                placeholder="例: マネージャー、ディレクター"
+                placeholder="例: ディレクター、マネージャー"
                 disabled={isCreating}
               />
             </div>
@@ -398,6 +458,8 @@ export default function UserManagementPage() {
                   <th className="py-2 px-4 text-left">ユーザーID</th>
                   <th className="py-2 px-4 text-left">ロール</th>
                   <th className="py-2 px-4 text-left">所属</th>
+                  <th className="py-2 px-4 text-left">ポジション</th>
+                  <th className="py-2 px-4 text-left">レベル</th>
                   <th className="py-2 px-4 text-left">作成日時</th>
                   <th className="py-2 px-4 text-left">操作</th>
                 </tr>
@@ -409,9 +471,20 @@ export default function UserManagementPage() {
                     <td className="py-2 px-4">{user.username}</td>
                     <td className="py-2 px-4">{USER_ROLE_DISPLAY_NAMES[user.role]}</td>
                     <td className="py-2 px-4">{user.company || '-'}</td>
+                    <td className="py-2 px-4">{user.position || '-'}</td>
+                    <td className="py-2 px-4">{user.level || '-'}</td>
                     <td className="py-2 px-4">{formatDate(user.created_at)}</td>
                     <td className="py-2 px-4">
                       <div className="flex space-x-2">
+                        {user.role === 'staff' && (
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => fetchStaffAttendance(user.id)}
+                          >
+                            勤怠
+                          </Button>
+                        )}
                         <Button 
                           variant="outline" 
                           size="sm"
@@ -487,6 +560,45 @@ export default function UserManagementPage() {
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      
+      {/* スタッフ勤怠履歴モーダル */}
+      {activeAttendanceStaff && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg max-w-4xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold">{staffHistoryName}の勤怠履歴</h3>
+              <Button variant="outline" onClick={closeAttendanceModal}>閉じる</Button>
+            </div>
+            
+            {isLoadingHistory ? (
+              <p className="text-center py-4">読み込み中...</p>
+            ) : historyError ? (
+              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+                {historyError}
+              </div>
+            ) : staffHistory.length === 0 ? (
+              <p className="text-center py-4">勤怠履歴はありません</p>
+            ) : (
+              <div className="space-y-2">
+                {staffHistory.map((item) => (
+                  <div key={item.id} className="mb-2 p-2 border-b flex items-center">
+                    <div className="mr-2 w-40 text-sm text-gray-500">{formatTimeWithSeconds(item.created_at)}</div>
+                    <div className="flex-grow">
+                      <span className="font-medium">{item.display_name}</span>
+                      <span className="mx-2">→</span>
+                      {item.status === 'カスタム' && item.custom_status ? (
+                        <span className={getStatusColor(item.status)}>{item.custom_status}</span>
+                      ) : (
+                        <span className={getStatusColor(item.status)}>{item.status}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
