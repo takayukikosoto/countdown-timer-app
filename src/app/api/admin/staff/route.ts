@@ -24,8 +24,8 @@ export async function GET(request: NextRequest) {
     // スタッフ一覧を取得
     // 開発用に一時的にパスワードも取得する
     const { data: staff, error } = await supabase
-      .from('admin_users')
-      .select('id, username, display_name, created_at, company, staff_position, staff_level, password_hash')
+      .from('users')
+      .select('id, username, display_name, created_at, company, position, level, password')
       .eq('role', 'staff')
       .order('created_at', { ascending: false });
 
@@ -78,12 +78,12 @@ export async function POST(request: NextRequest) {
     const username = `staff_${randomId}_${timestamp}`;
     
     // スタッフユーザーを作成
+    // 作成時は旧シグネチャ (username, password, name) を使用する
+    const randomPassword = Math.random().toString(36).slice(-10);
     const { data, error } = await supabase.rpc('create_staff_user', {
       p_username: username,
-      p_display_name: body.display_name,
-      p_company: body.company || null,
-      p_staff_position: body.staff_position || null,
-      p_staff_level: body.staff_level || null
+      p_password: randomPassword,
+      p_name: body.display_name
     });
 
     if (error) {

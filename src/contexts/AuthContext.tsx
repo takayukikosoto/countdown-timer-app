@@ -112,43 +112,98 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // ログイン関数
   const handleLogin = async (username: string, password: string) => {
+    setLoading(true);
+    console.log('ログイン処理開始:', { username });
+    
     try {
-      console.log('ログイン処理を開始します:', { username });
-      
+      console.log('ログインAPIを呼び出し中...');
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ username, password }),
+        credentials: 'include', // クッキーを含める
       });
       
-      const data = await response.json();
+      console.log('ログインAPIレスポンス受信:', { 
+        status: response.status, 
+        statusText: response.statusText,
+        ok: response.ok
+      });
       
-      if (!response.ok) {
-        console.error('ログインに失敗しました:', data.error);
-        return { success: false, message: data.error || 'ログインに失敗しました' };
+      let data;
+      try {
+        data = await response.json();
+        console.log('レスポンスデータ:', { 
+          hasData: !!data,
+          hasSession: !!(data && data.session),
+          hasUser: !!(data && data.user),
+          hasError: !!(data && data.error),
+          error: data?.error
+        });
+      } catch (e) {
+        console.error('レスポンスのJSON解析エラー:', e);
+        return { success: false, message: 'APIレスポンスの解析に失敗しました' };
       }
       
-      console.log('ログイン成功:', data);
+      if (!response.ok) {
+        // エラーメッセージの取得とフォールバック
+        let errorMessage = 'ログインに失敗しました';
+        
+        if (data && typeof data === 'object') {
+          if (data.error && typeof data.error === 'string' && data.error.trim() !== '') {
+            errorMessage = data.error;
+          } else if (response.status === 401) {
+            errorMessage = 'ユーザー名またはパスワードが正しくありません';
+          } else if (response.status === 500) {
+            errorMessage = 'サーバーエラーが発生しました。後ほど再度お試しください';
+          }
+        }
+        
+        console.error('ログインに失敗しました:');
+        console.error('ステータス:', response.status);
+        console.error('ステータステキスト:', response.statusText);
+        console.error('エラー:', data?.error || 'エラー詳細なし');
+        console.error('エラーメッセージ:', errorMessage);
+        console.error('レスポンスデータ:', JSON.stringify(data, null, 2));
+        
+        return { success: false, message: errorMessage };
+      }
       
-      // セッション情報を保存
-      const session = data.session as AuthSession;
-      localStorage.setItem('auth_session', JSON.stringify(session));
+      console.log('ログイン成功:', { 
+        hasSession: !!(data && data.session),
+        hasUser: !!(data && data.user),
+        user: data?.user
+      });
       
-      // クッキーにトークンを保存
-      document.cookie = `auth_token=${session.access_token}; path=/; max-age=${60 * 60 * 24}; SameSite=Strict; Secure`;
+      // セッションを保存
+      const { session, user } = data;
+      
+      if (!session || !user) {
+        console.error('ログイン成功しましたが、セッションまたはユーザー情報がありません');
+        return { success: false, message: '認証に成功しましたが、セッション情報が不完全です' };
+      }
       
       setSession(session);
-      setUser(session.user);
+      setUser(user);
       
-      // ユーザーロールを確認
-      const role = session.user.user_metadata?.role;
-      console.log('ユーザーロール:', role);
+      // ユーザーロールの設定
+      const role = user?.role || null;
+      setUserRole(role);
       setIsAdmin(role === 'admin');
-      setIsStaff(role === 'staff' || role === 'admin');
-      setUserRole(role || null);
+      setIsStaff(role === 'staff');
       
+      console.log('ユーザーロール設定:', { role, isAdmin: role === 'admin', isStaff: role === 'staff' });
+      
+      // セッション情報とトークンをlocalStorageに保存
+      if (session?.access_token) {
+        localStorage.setItem('auth_token', session.access_token);
+        localStorage.setItem('auth_session', JSON.stringify(session));
+        console.log('セッション情報とトークンを保存しました');
+      } else {
+        console.warn('アクセストークンがありません');
+      }
       // ログイン成功時のみダッシュボードにリダイレクト
       setTimeout(() => {
         if (window.location.pathname === '/login') {
@@ -158,16 +213,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
       
       return { success: true };
     } catch (error) {
-      console.error('ログイン処理中にエラーが発生しました:', error);
+      console.error('ログイン処理中にエラーが発生しました:');
+      console.error('エラータイプ:', typeof error);
+      console.error('エラー内容:', error);
+      if (error instanceof Error) {
+        console.error('エラーメッセージ:', error.message);
+        console.error('スタックトレース:', error.stack);
+      }
       return { success: false, message: 'ログイン処理中にエラーが発生しました' };
+    } finally {
+      setLoading(false);
     }
   };
 
   // ログアウト関数
   const handleLogout = async () => {
     try {
-      // ローカルストレージからセッション情報を削除
+      // ローカルストレージからセッション情報とトークンを削除
       localStorage.removeItem('auth_session');
+      localStorage.removeItem('auth_token');
       
       // クッキーからトークンを削除
       document.cookie = 'auth_token=; path=/; max-age=0; SameSite=Strict; Secure';

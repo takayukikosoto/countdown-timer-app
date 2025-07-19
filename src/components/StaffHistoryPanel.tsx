@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card } from '@/components/ui/card';
 
 interface StatusHistoryItem {
@@ -7,6 +8,7 @@ interface StatusHistoryItem {
   status: string;
   custom_status: string | null;
   created_at: string;
+  display_name: string;
 }
 
 export default function StaffHistoryPanel() {
@@ -27,14 +29,17 @@ export default function StaffHistoryPanel() {
     }
   };
 
-  // 日時のフォーマット（秒数なし）
+  // 日時のフォーマット（秒数まで表示）
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
     return new Intl.DateTimeFormat('ja-JP', {
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      second: '2-digit'
     }).format(date);
   };
+
+  const { session } = useAuth();
 
   // ステータス履歴を取得
   useEffect(() => {
@@ -44,7 +49,12 @@ export default function StaffHistoryPanel() {
         setError(null);
         console.log('ステータス履歴を取得中...');
         
-        const response = await fetch('/api/staff/history');
+        // 認証情報を送信（クッキー＋ヘッダー）
+        const token = session?.access_token || localStorage.getItem('auth_token');
+        const response = await fetch('/api/staff/history', {
+          credentials: 'include',
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        });
         const responseText = await response.text();
         
         // レスポンスがJSONでない場合のエラーハンドリング

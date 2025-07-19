@@ -6,8 +6,8 @@ import AdminLayout from '@/components/layouts/AdminLayout';
 import VisitorCounterAdmin from '@/components/VisitorCounterAdmin';
 import VisitorCounter from '@/components/VisitorCounter';
 import VisitorHistoryTable from '@/components/VisitorHistoryTable';
-import { useVisitorCount } from '@/hooks/useVisitorCount';
-import { useVisitorHistory } from '@/hooks/useVisitorHistory';
+import { useVisitorCount } from '@/hooks/useVisitorCount_fixed';
+import { useVisitorHistory } from '@/hooks/useVisitorHistory_fixed';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
@@ -15,7 +15,8 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 export default function VisitorsAdminPage() {
   const { user, isAdmin } = useAuth();
   const { count } = useVisitorCount();
-  const { history, statistics } = useVisitorHistory(14);
+  const { history, getStatistics } = useVisitorHistory(14);
+  const statistics = getStatistics();
   const [periodDays, setPeriodDays] = useState<number>(14);
   
   // 履歴データをグラフ用に整形
@@ -23,9 +24,9 @@ export default function VisitorsAdminPage() {
     if (!history || history.length === 0) return [];
     
     return history
-      .sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime())
+      .sort((a, b) => new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime())
       .map(item => ({
-        date: new Date(item.event_date).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' }),
+        date: new Date(item.updated_at).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' }),
         count: item.count
       }));
   };
@@ -175,24 +176,24 @@ export default function VisitorsAdminPage() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
                   <div className="bg-black/30 p-3 rounded-lg">
                     <div className="text-xs text-gray-300 mb-1">合計</div>
-                    <div className="text-xl font-bold">{statistics.total.toLocaleString('ja-JP')} 人</div>
+                    <div className="text-xl font-bold">{statistics?.total?.toLocaleString('ja-JP') || 0} 人</div>
                   </div>
                   <div className="bg-black/30 p-3 rounded-lg">
                     <div className="text-xs text-gray-300 mb-1">平均</div>
-                    <div className="text-xl font-bold">{statistics.average.toLocaleString('ja-JP')} 人/日</div>
+                    <div className="text-xl font-bold">{statistics?.average?.toLocaleString('ja-JP') || 0} 人/日</div>
                   </div>
                   <div className="bg-black/30 p-3 rounded-lg">
                     <div className="text-xs text-gray-300 mb-1">最大</div>
-                    <div className="text-xl font-bold">{statistics.max.toLocaleString('ja-JP')} 人</div>
+                    <div className="text-xl font-bold">{statistics?.max?.toLocaleString('ja-JP') || 0} 人</div>
                     <div className="text-xs text-gray-400">
-                      {statistics.maxDate ? new Date(statistics.maxDate).toLocaleDateString('ja-JP') : '-'}
+                      {statistics?.maxDate ? new Date(statistics.maxDate).toLocaleDateString('ja-JP') : '-'}
                     </div>
                   </div>
                   <div className="bg-black/30 p-3 rounded-lg">
                     <div className="text-xs text-gray-300 mb-1">最小</div>
-                    <div className="text-xl font-bold">{statistics.min.toLocaleString('ja-JP')} 人</div>
+                    <div className="text-xl font-bold">{statistics?.min?.toLocaleString('ja-JP') || 0} 人</div>
                     <div className="text-xs text-gray-400">
-                      {statistics.minDate ? new Date(statistics.minDate).toLocaleDateString('ja-JP') : '-'}
+                      {statistics?.minDate ? new Date(statistics.minDate).toLocaleDateString('ja-JP') : '-'}
                     </div>
                   </div>
                 </div>

@@ -18,7 +18,7 @@ export function useStaffStatus() {
   const [updatedAt, setUpdatedAt] = useState<string>(new Date().toISOString());
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const { socket, connected } = useSocket();
 
   // スタッフステータス情報を取得
@@ -27,7 +27,11 @@ export function useStaffStatus() {
     
     try {
       setLoading(true);
-      const response = await fetch('/api/staff/status');
+      const token = session?.access_token || localStorage.getItem('auth_token');
+      const response = await fetch('/api/staff/status', {
+        credentials: 'include',
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
       if (!response.ok) {
         throw new Error('スタッフステータスの取得に失敗しました');
       }
@@ -49,10 +53,13 @@ export function useStaffStatus() {
     if (!user) return false;
     
     try {
+      const token = session?.access_token || localStorage.getItem('auth_token');
       const response = await fetch('/api/staff/status', {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
           status: newStatus,

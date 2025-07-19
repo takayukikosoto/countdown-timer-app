@@ -1,10 +1,10 @@
 import { NextRequest } from 'next/server';
 import jwt from 'jsonwebtoken';
 
-// JWTシークレットキー
+// JWT Secret Key
 const JWT_SECRET = process.env.JWT_SECRET || 'development-secret-key';
 
-// 認証結果の型定義
+// Authentication result type definition
 export interface AuthResult {
   success: boolean;
   user?: {
@@ -16,22 +16,30 @@ export interface AuthResult {
 }
 
 /**
- * リクエストからJWTトークンを取得して検証する
+ * Get JWT token from request and verify it
  */
 export async function verifyAuth(request: NextRequest): Promise<AuthResult> {
   try {
-    // クッキーからトークンを取得
-    const token = request.cookies.get('auth_token')?.value;
+    // Get token from cookie or Authorization header
+    let token = request.cookies.get('auth_token')?.value;
     
-    // トークンがない場合
+    // If no token in cookie, try Authorization header
+    if (!token) {
+      const authHeader = request.headers.get('Authorization') || request.headers.get('authorization');
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.substring(7).trim();
+      }
+    }
+    
+    // If no token found
     if (!token) {
       return { 
         success: false, 
-        error: 'トークンがありません' 
+        error: 'No token found' 
       };
     }
     
-    // トークンを検証
+    // Verify token
     const decoded = jwt.verify(token, JWT_SECRET) as {
       user_id: string;
       username: string;
@@ -48,16 +56,16 @@ export async function verifyAuth(request: NextRequest): Promise<AuthResult> {
     };
     
   } catch (error) {
-    console.error('認証エラー:', error);
+    console.error('Authentication error:', error);
     return { 
       success: false, 
-      error: '認証に失敗しました' 
+      error: 'Authentication failed' 
     };
   }
 }
 
 /**
- * ユーザーが特定のロールを持っているか確認する
+ * Check if user has specific role
  */
 export function hasRole(user: { role: string } | undefined, roles: string[]): boolean {
   if (!user) return false;
@@ -65,7 +73,7 @@ export function hasRole(user: { role: string } | undefined, roles: string[]): bo
 }
 
 /**
- * JWTトークンを生成する
+ * Generate JWT token
  */
 export async function createJWT(userData: { id: string; username: string; role: string }) {
   return jwt.sign(
@@ -75,6 +83,6 @@ export async function createJWT(userData: { id: string; username: string; role: 
       role: userData.role,
     },
     JWT_SECRET,
-    { expiresIn: '7d' } // 7日間有効
+    { expiresIn: '7d' } // Valid for 7 days
   );
 }

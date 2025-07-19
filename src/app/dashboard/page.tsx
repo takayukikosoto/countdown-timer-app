@@ -9,7 +9,7 @@ import ConnectionStatus from '@/components/ConnectionStatus';
 import ControlPanel from '@/components/ControlPanel';
 import { useSocket } from '@/contexts/SocketContext';
 import { useStatusData } from '@/hooks/useStatusData';
-import { useVisitorCount } from '@/hooks/useVisitorCount';
+import { useVisitorCount } from '@/hooks/useVisitorCount_fixed';
 import { formatDateTime } from '@/lib/timeSync';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -43,7 +43,7 @@ export default function Dashboard() {
         console.log('管理者としてダッシュボードにアクセスしています');
       }
     }
-  }, [loading, user, isAdmin, router]);
+  }, [loading, user, isAdmin]);
   
   // クライアントサイドでのみ実行
   useEffect(() => {

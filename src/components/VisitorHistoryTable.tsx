@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useVisitorHistory, VisitorHistoryItem } from '@/hooks/useVisitorHistory';
+import { useVisitorHistory, VisitorHistoryItem } from '@/hooks/useVisitorHistory_fixed';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { ArrowUpDown, Download } from 'lucide-react';
@@ -11,7 +11,8 @@ interface VisitorHistoryTableProps {
 }
 
 export default function VisitorHistoryTable({ days = 7, className = '' }: VisitorHistoryTableProps) {
-  const { history, loading, error, statistics, refreshHistory, fetchByPeriod } = useVisitorHistory(days);
+  const { history, loading, error, refreshHistory, fetchByPeriod, getStatistics } = useVisitorHistory(days);
+  const statistics = getStatistics();
   const [sortField, setSortField] = useState<keyof VisitorHistoryItem>('event_date');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   
@@ -76,7 +77,8 @@ export default function VisitorHistoryTable({ days = 7, className = '' }: Visito
   };
 
   // 日付をフォーマット
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | undefined) => {
+    if (!dateString) return '-';
     const date = new Date(dateString);
     return date.toLocaleDateString('ja-JP', {
       year: 'numeric',

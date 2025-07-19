@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useVisitorCount } from '@/hooks/useVisitorCount';
+import { useVisitorCount } from '@/hooks/useVisitorCount_fixed';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { PlusIcon, MinusIcon, RotateCcwIcon } from 'lucide-react';

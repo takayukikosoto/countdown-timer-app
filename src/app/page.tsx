@@ -14,10 +14,18 @@ import { useTimerData } from '@/hooks/useTimerData';
 import CurrentDateTime from '@/components/CurrentDateTime';
 import Link from 'next/link';
 import { TimerSettings } from '@/lib/countdownTimer';
+import { useAuth } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
+import { useRouter } from 'next/navigation';
 
 export default function Home() {
   // クエリパラメータからモードを取得
   const [isViewOnly, setIsViewOnly] = useState(false);
+  
+  // 認証状態とルーター
+  const { user, isAdmin, isStaff, logout } = useAuth();
+  const router = useRouter();
+  const [logoutLoading, setLogoutLoading] = useState(false);
   
   // Socket.IO接続
   const { socket, connected } = useSocket();
@@ -41,14 +49,33 @@ export default function Home() {
   const [customTitle, setCustomTitle] = useState<string>('');
   const [customMessage, setCustomMessage] = useState<string>('');
   
-  // 自動リロード用の状態
-  const [lastStatus, setLastStatus] = useState<string>('');
-  const [lastTimerId, setLastTimerId] = useState<string | null>(null);
-  const reloadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // 自動リロード機能は無効化（無限ループ防止のため）
+  // const [lastStatus, setLastStatus] = useState<string>('');
+  // const [lastTimerId, setLastTimerId] = useState<string | null>(null);
+  // const reloadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // フルスクリーン状態の管理
   const [isFullscreen, setIsFullscreen] = useState(false);
   
+  // ログアウト処理
+  const handleLogout = async () => {
+    try {
+      setLogoutLoading(true);
+      const success = await logout();
+      if (success) {
+        console.log('ログアウトしました');
+        // ホームページにリダイレクト（現在のページをリロード）
+        window.location.reload();
+      } else {
+        console.error('ログアウトに失敗しました');
+      }
+    } catch (error) {
+      console.error('ログアウト処理中にエラーが発生しました:', error);
+    } finally {
+      setLogoutLoading(false);
+    }
+  };
+
   // フルスクリーン切り替え関数
   const toggleFullscreen = async () => {
     try {
@@ -110,17 +137,17 @@ export default function Home() {
         if (title) setCustomTitle(decodeURIComponent(title));
         if (message) setCustomMessage(decodeURIComponent(message));
         
-        // 初期状態を保存
-        setLastStatus(status);
-        if (currentTimer) {
-          setLastTimerId(currentTimer.id);
-        }
+        // 初期状態を保存（無効化）
+        // setLastStatus(status);
+        // if (currentTimer) {
+        //   setLastTimerId(currentTimer.id);
+        // }
       } else {
         setViewMode(null);
         setIsViewOnly(false);
       }
     }
-  }, [status, currentTimer]);
+  }, []);  // 依存配列を空にして初回のみ実行
   
   // ステータスに応じた背景色の設定
   const getBackgroundColorByStatus = (status: string): string => {
@@ -139,75 +166,31 @@ export default function Home() {
     if (!isViewOnly || viewMode !== 'full') return;
     if (!status) return; // ステータスが空の場合は何もしない
     
-    console.log(`現在のステータス: ${status}, 前回のステータス: ${lastStatus || 'なし'}`);
+    console.log(`現在のステータス: ${status}, 前回のステータス: ${status}`);
     
     // 初期化時に現在のステータスを保存（一度だけ）
-    if (!lastStatus) {
+    if (!status) {
       console.log(`初期ステータスを設定: ${status}`);
-      setLastStatus(status);
       return;
     }
-    
-    // ステータスが変更された場合のみ処理
-    if (status !== lastStatus) {
-      console.log(`ステータスが変更されました: ${lastStatus} → ${status}`);
-      setLastStatus(status);
-      
-      // 連続リロードを防ぐため、少し遅延させてからリロード
-      if (reloadTimeoutRef.current) {
-        clearTimeout(reloadTimeoutRef.current);
-      }
-      
-      reloadTimeoutRef.current = setTimeout(() => {
-        console.log('ステータス変更によりページをリロードします...');
-        window.location.reload();
-      }, 1500);
-    }
-    
-    return () => {
-      if (reloadTimeoutRef.current) {
-        clearTimeout(reloadTimeoutRef.current);
-      }
-    };
-  }, [status, lastStatus, isViewOnly, viewMode]);
+  }, [status, isViewOnly, viewMode]);
   
-  // Socket.IOでステータス変更イベントを監視
+  // Socket.IOでステータス変更イベントを監視（自動リロード無効化）
   useEffect(() => {
     if (!isViewOnly || viewMode !== 'full' || !socket || !connected) return;
     
-    console.log('Socket.IOステータス監視を開始しました');
+    console.log('Socket.IOステータス監視を開始しました（リロード無効）');
     
-    // ステータス更新イベント
+    // ステータス更新イベント（リロードなし）
     const handleStatusUpdate = (data: { status: string }) => {
       console.log(`Socket.IOイベント受信: status:update`, data);
-      
-      if (data.status) {
-        console.log(`Socket.IOイベント: ステータス受信 - 現在:${data.status}, 前回:${lastStatus || 'なし'}`);
-        
-        if (!lastStatus || data.status !== lastStatus) {
-          console.log(`Socket.IOイベント: ステータスが変更されました: ${lastStatus || '初期化'} → ${data.status}`);
-          setLastStatus(data.status);
-          
-          // 連続リロードを防ぐため、少し遅延させてからリロード
-          if (reloadTimeoutRef.current) {
-            clearTimeout(reloadTimeoutRef.current);
-          }
-          
-          reloadTimeoutRef.current = setTimeout(() => {
-            console.log('ステータス変更によりページをリロードします...');
-            window.location.reload();
-          }, 1500);
-        }
-      }
+      // 自動リロードは無効化済み
     };
     
-    // 初期状態受信イベント
+    // 初期状態受信イベント（リロードなし）
     const handleInitialState = (data: { status?: string }) => {
       console.log('Socket.IOイベント受信: state', data);
-      if (data.status) {
-        console.log(`初期状態受信: ステータス=${data.status}`);
-        setLastStatus(data.status);
-      }
+      // 自動リロードは無効化済み
     };
     
     // イベントリスナー登録
@@ -222,69 +205,33 @@ export default function Home() {
       socket.off('status:update', handleStatusUpdate);
       socket.off('state', handleInitialState);
     };
-  }, [socket, connected, lastStatus, isViewOnly, viewMode]);
+  }, [socket, connected, isViewOnly, viewMode]);
   
-  // 全画面表示モードでのタイマー変更検知と自動リロード
-  useEffect(() => {
-    if (!isViewOnly || viewMode !== 'full') return;
-    if (!currentTimer || !lastTimerId || currentTimer.id === lastTimerId) return;
-    
-    console.log(`タイマーが変更されました: ${lastTimerId} → ${currentTimer.id}`);
-    setLastTimerId(currentTimer.id);
-    
-    // 連続リロードを防ぐため、少し遅延させてからリロード
-    if (reloadTimeoutRef.current) {
-      clearTimeout(reloadTimeoutRef.current);
-    }
-    
-    reloadTimeoutRef.current = setTimeout(() => {
-      console.log('タイマー変更によりページをリロードします...');
-      window.location.reload();
-    }, 1500);
-    
-    return () => {
-      if (reloadTimeoutRef.current) {
-        clearTimeout(reloadTimeoutRef.current);
-      }
-    };
-  }, [currentTimer, lastTimerId, isViewOnly, viewMode]);
+  // 全画面表示モードでのタイマー変更検知（自動リロード無効化）
+  // useEffect(() => {
+  //   if (!isViewOnly || viewMode !== 'full') return;
+  //   if (!currentTimer || !lastTimerId || currentTimer.id === lastTimerId) return;
+  //   
+  //   console.log(`タイマーが変更されました: ${lastTimerId} → ${currentTimer.id}`);
+  //   // 自動リロードは無効化済み
+  // }, [currentTimer, isViewOnly, viewMode]);
   
-  // Socket.IOイベントリスナーの設定
+  // Socket.IOイベントリスナーの設定（自動リロード無効化）
   useEffect(() => {
     if (!isViewOnly || viewMode !== 'full' || !socket || !connected) return;
     
-    // タイマー更新イベント
+    // タイマー更新イベント（リロードなし）
     const handleTimerUpdate = (data: { timer: TimerSettings }) => {
-      if (lastTimerId && data.timer && data.timer.id !== lastTimerId) {
-        console.log(`Socket.IOイベント: タイマーが変更されました: ${lastTimerId} → ${data.timer.id}`);
-        
-        // 連続リロードを防ぐため、少し遅延させてからリロード
-        if (reloadTimeoutRef.current) {
-          clearTimeout(reloadTimeoutRef.current);
-        }
-        
-        reloadTimeoutRef.current = setTimeout(() => {
-          console.log('タイマー変更によりページをリロードします...');
-          window.location.reload();
-        }, 1500);
-      }
-      
-      // 現在のタイマーIDを保存
-      if (data.timer) {
-        setLastTimerId(data.timer.id);
-      }
+      console.log(`Socket.IOイベント: タイマー更新受信`, data);
+      // 自動リロードは無効化済み
     };
     
     socket.on('timer:update', handleTimerUpdate);
     
     return () => {
       socket.off('timer:update', handleTimerUpdate);
-      
-      if (reloadTimeoutRef.current) {
-        clearTimeout(reloadTimeoutRef.current);
-      }
     };
-  }, [socket, connected, lastTimerId, isViewOnly, viewMode]);
+  }, [socket, connected, isViewOnly, viewMode]);
 
   return (
     <div className={`min-h-screen ${isViewOnly ? getBackgroundColorByStatus(status) : 'bg-gradient-to-br from-gray-900 to-blue-900'} text-gray-100 transition-colors duration-500`}>
@@ -506,7 +453,37 @@ export default function Home() {
                   )}
                 </div>
                 
-                {/* ダッシュボードリンク */}
+                {/* 認証メニュー */}
+                <div className="bg-black/40 backdrop-blur-md rounded-lg shadow-md p-6 border border-white/10">
+                  <h2 className="text-xl font-semibold mb-4 text-white">認証メニュー</h2>
+                  <div className="flex flex-col gap-4">
+                    {user ? (
+                      <>
+                        <div className="text-center text-white mb-2">
+                          <p className="text-sm">ログイン中: <span className="font-semibold">{user.user_metadata?.name || user.email}</span></p>
+                          {isAdmin && <p className="text-xs text-blue-300">管理者権限</p>}
+                          {isStaff && !isAdmin && <p className="text-xs text-green-300">スタッフ権限</p>}
+                        </div>
+                        <Button
+                          onClick={handleLogout}
+                          disabled={logoutLoading}
+                          className="bg-red-600/80 hover:bg-red-700/90 text-white font-medium py-2 px-4 rounded-md transition-all duration-200 shadow-sm border border-white/10"
+                        >
+                          {logoutLoading ? 'ログアウト中...' : 'ログアウト'}
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        onClick={() => router.push('/login')}
+                        className="bg-blue-600/80 hover:bg-blue-700/90 text-white font-medium py-2 px-4 rounded-md transition-all duration-200 shadow-sm border border-white/10"
+                      >
+                        ログイン
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* 管理メニュー */}
                 <div className="bg-black/40 backdrop-blur-md rounded-lg shadow-md p-6 border border-white/10">
                   <h2 className="text-xl font-semibold mb-4 text-white">管理メニュー</h2>
                   <div className="flex flex-col gap-4">

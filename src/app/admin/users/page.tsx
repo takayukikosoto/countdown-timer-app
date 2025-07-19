@@ -19,7 +19,7 @@ interface UserData {
   updated_at?: string;
 }
 
-// 日時のフォーマット（秒数なし）
+// 日時のフォーマット（秒数まで表示）
 const formatDate = (dateString: string) => {
   const date = new Date(dateString);
   return new Intl.DateTimeFormat('ja-JP', {
@@ -27,7 +27,8 @@ const formatDate = (dateString: string) => {
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
+    second: '2-digit'
   }).format(date);
 };
 

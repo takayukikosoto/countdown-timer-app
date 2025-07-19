@@ -4,9 +4,7 @@ import { supabase } from '@/lib/supabase';
 export interface VisitorHistoryItem {
   id: string;
   count: number;
-  event_date: string;
   updated_at: string;
-  created_at: string;
 }
 
 export const useVisitorHistory = (days: number = 7) => {
@@ -18,24 +16,39 @@ export const useVisitorHistory = (days: number = 7) => {
   const fetchVisitorHistory = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
       
-      // 指定した日数分の履歴を取得
+      // 指定した日数分の履歴を取得（updated_atを使用）
       const endDate = new Date();
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
       
+      console.log('来場者数履歴取得開始:', {
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        days
+      });
+      
       const { data, error } = await supabase
         .from('visitors')
         .select('*')
-        .gte('event_date', startDate.toISOString().split('T')[0])
-        .lte('event_date', endDate.toISOString().split('T')[0])
-        .order('event_date', { ascending: false });
+        .gte('updated_at', startDate.toISOString())
+        .lte('updated_at', endDate.toISOString())
+        .order('updated_at', { ascending: false });
       
       if (error) {
-        console.error('来場者数履歴の取得エラー:', error);
-        setError(error.message);
+        console.error('来場者数履歴の取得エラー - 詳細:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+          full_error: error
+        });
+        setError(error.message || 'データベースエラーが発生しました');
         return;
       }
+      
+      console.log('来場者数履歴取得成功:', { dataCount: data?.length || 0 });
       
       if (data) {
         setHistory(data as VisitorHistoryItem[]);
@@ -43,30 +56,48 @@ export const useVisitorHistory = (days: number = 7) => {
         setHistory([]);
       }
     } catch (err) {
-      console.error('来場者数履歴の取得中にエラーが発生しました:', err);
-      setError('来場者数履歴の取得に失敗しました');
+      console.error('来場者数履歴の取得中にエラーが発生しました - 詳細:', {
+        error: err,
+        message: err instanceof Error ? err.message : 'Unknown error',
+        stack: err instanceof Error ? err.stack : undefined
+      });
+      setError(err instanceof Error ? err.message : '来場者数履歴の取得に失敗しました');
     } finally {
       setLoading(false);
     }
-  }, [days, setLoading, setError, setHistory]);
+  }, [days]);
 
   // 特定の期間の来場者数履歴を取得
   const fetchVisitorHistoryByPeriod = useCallback(async (startDate: Date, endDate: Date) => {
     try {
       setLoading(true);
+      setError(null);
+      
+      console.log('期間指定来場者数履歴取得開始:', {
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString()
+      });
       
       const { data, error } = await supabase
         .from('visitors')
         .select('*')
-        .gte('event_date', startDate.toISOString().split('T')[0])
-        .lte('event_date', endDate.toISOString().split('T')[0])
-        .order('event_date', { ascending: false });
+        .gte('updated_at', startDate.toISOString())
+        .lte('updated_at', endDate.toISOString())
+        .order('updated_at', { ascending: false });
       
       if (error) {
-        console.error('来場者数履歴の取得エラー:', error);
-        setError(error.message);
+        console.error('来場者数履歴の取得エラー - 詳細:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+          full_error: error
+        });
+        setError(error.message || 'データベースエラーが発生しました');
         return;
       }
+      
+      console.log('期間指定来場者数履歴取得成功:', { dataCount: data?.length || 0 });
       
       if (data) {
         setHistory(data as VisitorHistoryItem[]);
@@ -74,12 +105,16 @@ export const useVisitorHistory = (days: number = 7) => {
         setHistory([]);
       }
     } catch (err) {
-      console.error('来場者数履歴の取得中にエラーが発生しました:', err);
-      setError('来場者数履歴の取得に失敗しました');
+      console.error('来場者数履歴の取得中にエラーが発生しました - 詳細:', {
+        error: err,
+        message: err instanceof Error ? err.message : 'Unknown error',
+        stack: err instanceof Error ? err.stack : undefined
+      });
+      setError(err instanceof Error ? err.message : '来場者数履歴の取得に失敗しました');
     } finally {
       setLoading(false);
     }
-  }, [setLoading, setError, setHistory]);
+  }, []);
 
   // 統計情報を計算
   const getStatistics = useCallback(() => {
@@ -98,54 +133,34 @@ export const useVisitorHistory = (days: number = 7) => {
     const average = Math.round(total / history.length);
     
     const maxItem = history.reduce((max, item) => 
-      item.count > max.count ? item : max, history[0]);
+      item.count > max.count ? item : max
+    );
     
     const minItem = history.reduce((min, item) => 
-      item.count < min.count ? item : min, history[0]);
-    
+      item.count < min.count ? item : min
+    );
+
     return {
       total,
       average,
       max: maxItem.count,
-      maxDate: maxItem.event_date,
+      maxDate: maxItem.updated_at,
       min: minItem.count,
-      minDate: minItem.event_date
+      minDate: minItem.updated_at
     };
   }, [history]);
 
-  // 初期データを取得
+  // 初回読み込み
   useEffect(() => {
     fetchVisitorHistory();
-    
-    // Supabaseのリアルタイムリスナーを設定
-    const subscription = supabase
-      .channel('visitors-history-changes')
-      .on('postgres_changes', 
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'visitors' 
-        }, 
-        () => {
-          // データが変更されたら再取得
-          fetchVisitorHistory();
-        }
-      )
-      .subscribe();
-    
-    // クリーンアップ
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [days, fetchVisitorHistory]);
+  }, [fetchVisitorHistory]);
 
   return {
     history,
     loading,
     error,
-    statistics: getStatistics(),
-    getStatistics,
-    refreshHistory: fetchVisitorHistory,
-    fetchByPeriod: fetchVisitorHistoryByPeriod
+    fetchVisitorHistory,
+    fetchVisitorHistoryByPeriod,
+    getStatistics
   };
 };
