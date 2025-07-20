@@ -7,7 +7,7 @@ import { useSocket } from '@/contexts/SocketContext';
 interface CountdownTimerProps {
   timer: TimerSettings;
   className?: string;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'ultra' | 'mobile';
   onComplete?: () => void;
   message?: TimerMessage | null;
 }
@@ -33,7 +33,9 @@ export default function CountdownTimer({
     sm: 'text-3xl',
     md: 'text-5xl',
     lg: 'text-7xl',
-    xl: 'text-9xl'
+    xl: 'text-9xl',
+    ultra: 'text-[9rem] md:text-[12rem] lg:text-[15rem]', // 超大型表示用（75%サイズ）
+    mobile: 'text-[8rem] md:text-[10rem]' // モバイル用大型表示
   };
 
   useEffect(() => {
@@ -230,7 +232,9 @@ export default function CountdownTimer({
       sm: 'p-2',
       md: 'p-3',
       lg: 'p-4',
-      xl: 'p-5'
+      xl: 'p-5',
+      ultra: 'p-8',
+      mobile: 'p-6'
     };
     
     // サイズに応じたラベルのクラス
@@ -238,7 +242,9 @@ export default function CountdownTimer({
       sm: 'text-xs mt-1',
       md: 'text-xs mt-1',
       lg: 'text-sm mt-2',
-      xl: 'text-base mt-2'
+      xl: 'text-base mt-2',
+      ultra: 'text-2xl mt-4',
+      mobile: 'text-xl mt-3'
     };
     
     // サイズに応じた最小幅
@@ -246,7 +252,9 @@ export default function CountdownTimer({
       sm: '70px',
       md: '90px',
       lg: '110px',
-      xl: '140px'
+      xl: '140px',
+      ultra: '320px',
+      mobile: '200px'
     };
     
     
@@ -284,7 +292,9 @@ export default function CountdownTimer({
       sm: 'text-3xl',
       md: 'text-4xl',
       lg: 'text-5xl',
-      xl: 'text-6xl'
+      xl: 'text-6xl',
+      ultra: 'text-[8rem]',
+      mobile: 'text-[4rem]'
     };
     
     // コロンのスタイル

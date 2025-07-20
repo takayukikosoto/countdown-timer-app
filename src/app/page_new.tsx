@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,13 +9,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useStatusData } from '@/hooks/useStatusData';
 import { useVisitorCount } from '@/hooks/useVisitorCount';
-import { useTimerData } from '@/hooks/useTimerData';
 import ServerClock from '@/components/ServerClock';
 import ConnectionStatus from '@/components/ConnectionStatus';
-import CountdownTimer from '@/components/CountdownTimer';
-import TimerMessage from '@/components/TimerMessage';
-import StatusDisplay from '@/components/StatusDisplay';
-import CurrentDateTime from '@/components/CurrentDateTime';
 import { 
   Calendar, 
   Users, 
@@ -37,35 +32,11 @@ export default function Home() {
   const router = useRouter();
   const [logoutLoading, setLogoutLoading] = useState(false);
   
-  // 表示モード状態
-  const [viewMode, setViewMode] = useState<'view' | 'full' | 'mobile' | null>(null);
-  const [isViewOnly, setIsViewOnly] = useState(false);
-  const [customTitle, setCustomTitle] = useState<string>('');
-  const [customMessage, setCustomMessage] = useState<string>('');
-  
   // ステータスデータの取得
   const { status, error: statusError } = useStatusData();
   
   // Supabaseから来場者数を取得
   const { count: visitorCount } = useVisitorCount();
-  
-  // タイマーデータの取得
-  const { currentTimer, messages, error: timerError } = useTimerData();
-  
-  // URLパラメータをチェック
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const mode = urlParams.get('mode');
-    const customTitleParam = urlParams.get('title') || '';
-    const customMessageParam = urlParams.get('message') || '';
-
-    if (mode) {
-      setViewMode(mode as 'view' | 'full' | 'mobile');
-      setIsViewOnly(true);
-      setCustomTitle(customTitleParam);
-      setCustomMessage(customMessageParam);
-    }
-  }, []);
   
   // ログアウト処理
   const handleLogout = async () => {
@@ -96,132 +67,6 @@ export default function Home() {
     connection: 'オンライン'
   };
 
-  // 表示モードの場合は専用画面を表示
-  if (isViewOnly && viewMode) {
-    // Mobileモードの場合
-    if (viewMode === 'mobile') {
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black flex flex-col overflow-hidden">
-          {/* モバイル用ミニマルヘッダー */}
-          <header className="bg-black/60 backdrop-blur-md px-4 py-2">
-            <div className="flex justify-between items-center">
-              <div className="text-white text-xs opacity-80">
-                {customTitle || 'イベント'}
-              </div>
-              <div className="text-white text-xs opacity-80">
-                <ServerClock />
-              </div>
-            </div>
-          </header>
-
-          {/* モバイルメインコンテンツ */}
-          <main className="flex-1 flex flex-col items-center justify-center px-4 py-8">
-            {/* ステータス表示（コンパクト） */}
-            <div className="mb-6">
-              <StatusDisplay status={status || '準備中'} />
-            </div>
-
-            {/* モバイル用大型タイマー表示 */}
-            {currentTimer && (
-              <div className="mb-6 w-full">
-                <CountdownTimer 
-                  timer={currentTimer} 
-                  size="mobile"
-                  className="mobile-timer"
-                />
-              </div>
-            )}
-
-            {/* メッセージ表示（コンパクト） */}
-            {customMessage ? (
-              <div className="text-center px-2">
-                <p className="text-lg md:text-xl text-white font-medium leading-relaxed">
-                  {customMessage}
-                </p>
-              </div>
-            ) : (
-              currentTimer && messages && messages.length > 0 && (
-                <div className="text-center px-2">
-                  <TimerMessage message={messages[0]} />
-                </div>
-              )
-            )}
-          </main>
-        </div>
-      );
-    }
-
-    // FullモードとViewモード
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black flex flex-col">
-        {/* ヘッダー（ビューモードでは最小限） */}
-        <header className="bg-black/40 backdrop-blur-md p-4">
-          <div className="flex justify-between items-center">
-            <div className="text-white text-lg opacity-70">
-              {customTitle || 'イベントタイマー'}
-            </div>
-            <div className="flex items-center space-x-4">
-              <ServerClock />
-              <ConnectionStatus isConnected={true} />
-            </div>
-          </div>
-        </header>
-
-        {/* メインコンテンツ */}
-        <main className="flex-1 flex flex-col items-center justify-center p-8">
-          {/* カスタムタイトル */}
-          {customTitle && (
-            <div className="text-center mb-12">
-              <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold text-white mb-6">
-                {customTitle}
-              </h1>
-            </div>
-          )}
-
-          {/* ステータス表示 */}
-          <div className="mb-12">
-            <StatusDisplay status={status || '準備中'} />
-          </div>
-
-          {/* 大型タイマー表示 */}
-          {currentTimer && (
-            <div className="mb-12">
-              <CountdownTimer 
-                timer={currentTimer} 
-                size="ultra"
-                className="ultra-large-timer"
-              />
-            </div>
-          )}
-
-          {/* カスタムメッセージまたはタイマーメッセージ */}
-          {customMessage ? (
-            <div className="text-center">
-              <p className="text-2xl md:text-4xl lg:text-5xl text-white font-medium leading-relaxed">
-                {customMessage}
-              </p>
-            </div>
-          ) : (
-            currentTimer && messages && messages.length > 0 && (
-              <div className="text-center">
-                <TimerMessage
-                  message={messages[0]}
-                />
-              </div>
-            )
-          )}
-        </main>
-
-        {/* フッター（ビューモードでは最小限） */}
-        <footer className="bg-black/40 backdrop-blur-md p-2">
-          <div className="text-center text-sm text-gray-400">
-            イベント管理システム
-          </div>
-        </footer>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* ヘッダー */}
@@ -237,7 +82,7 @@ export default function Home() {
             </div>
             
             <div className="flex items-center space-x-4">
-              <ConnectionStatus isConnected={true} />
+              <ConnectionStatus />
               <ServerClock />
               
               {user ? (
@@ -245,7 +90,7 @@ export default function Home() {
                   <Badge variant={isAdmin ? 'default' : 'secondary'}>
                     {isAdmin ? '管理者' : isStaff ? 'スタッフ' : 'ゲスト'}
                   </Badge>
-                  <span className="text-sm text-gray-700">{user.user_metadata?.name || user.email || 'ユーザー'}</span>
+                  <span className="text-sm text-gray-700">{user.username}</span>
                   <Button 
                     variant="outline" 
                     size="sm" 
@@ -322,22 +167,12 @@ export default function Home() {
                 管理者機能
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Link href="/dashboard">
+                <Link href="/admin">
                   <Card className="hover:shadow-lg transition-shadow cursor-pointer">
                     <CardContent className="flex flex-col items-center p-6">
                       <BarChart3 className="h-8 w-8 text-blue-600 mb-2" />
                       <h4 className="font-medium text-center">管理ダッシュボード</h4>
                       <p className="text-sm text-gray-600 text-center mt-1">システム全体の監視・管理</p>
-                    </CardContent>
-                  </Card>
-                </Link>
-                
-                <Link href="/admin">
-                  <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-                    <CardContent className="flex flex-col items-center p-6">
-                      <BarChart3 className="h-8 w-8 text-indigo-600 mb-2" />
-                      <h4 className="font-medium text-center">統計レポート</h4>
-                      <p className="text-sm text-gray-600 text-center mt-1">ロール別・企業別統計分析</p>
                     </CardContent>
                   </Card>
                 </Link>
