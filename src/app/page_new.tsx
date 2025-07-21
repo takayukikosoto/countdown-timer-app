@@ -15,9 +15,9 @@ import {
   Calendar, 
   Users, 
   Timer, 
-  BarChart3, 
+  BarChart, 
   Settings, 
-  UserCheck, 
+  User, 
   Monitor,
   Clock,
   Activity,
@@ -170,7 +170,7 @@ export default function Home() {
                 <Link href="/admin">
                   <Card className="hover:shadow-lg transition-shadow cursor-pointer">
                     <CardContent className="flex flex-col items-center p-6">
-                      <BarChart3 className="h-8 w-8 text-blue-600 mb-2" />
+                      <BarChart className="h-8 w-8 text-blue-600 mb-2" />
                       <h4 className="font-medium text-center">管理ダッシュボード</h4>
                       <p className="text-sm text-gray-600 text-center mt-1">システム全体の監視・管理</p>
                     </CardContent>
@@ -180,7 +180,7 @@ export default function Home() {
                 <Link href="/admin/users">
                   <Card className="hover:shadow-lg transition-shadow cursor-pointer">
                     <CardContent className="flex flex-col items-center p-6">
-                      <UserCheck className="h-8 w-8 text-green-600 mb-2" />
+                      <User className="h-8 w-8 text-green-600 mb-2" />
                       <h4 className="font-medium text-center">ユーザー管理</h4>
                       <p className="text-sm text-gray-600 text-center mt-1">スタッフ・参加者の管理</p>
                     </CardContent>
@@ -214,7 +214,7 @@ export default function Home() {
           {(isAdmin || isStaff) && (
             <div className="mb-8">
               <h3 className="text-lg font-medium text-gray-800 mb-4 flex items-center">
-                <UserCheck className="h-5 w-5 mr-2" />
+                <User className="h-5 w-5 mr-2" />
                 スタッフ機能
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

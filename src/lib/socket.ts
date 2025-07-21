@@ -7,19 +7,19 @@ import { getStatusFromDB, setStatusInDB } from './status';
 import { getVisitorsFromDB, incrementVisitorsInDB } from './visitors';
 import { 
   getCurrentTimer,
-  saveTimer, 
-  startTimer, 
-  pauseTimer, 
-  resetTimer, 
-  createTimer, 
-  deleteTimer, 
+  saveTimer,
+  startTimer,
+  pauseTimer,
+  resetTimer,
+  createTimer,
+  deleteTimer,
   getAllTimers,
   TimerSettings,
   sendTimerMessage,
   deleteTimerMessage,
   getAllTimerMessages,
   TimerMessage
-} from './countdownTimer';
+} from './countdownTimerSupabase';
 
 // Socket.IO サーバーのシングルトンインスタンス
 declare global {

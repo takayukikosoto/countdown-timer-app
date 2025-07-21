@@ -62,7 +62,7 @@ const getRoleColor = (role: string) => {
   }
 };
 
-export default function AdminDashboard() {
+function AdminDashboard() {
   const router = useRouter();
   const auth = useAuth();
   const { user, isLoading, isAdmin } = auth;
@@ -252,3 +252,5 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
+export default AdminDashboard;

@@ -3,7 +3,7 @@ import {
   getCurrentTimer, 
   getAllTimers, 
   getAllTimerMessages
-} from '@/lib/countdownTimer';
+} from '@/lib/countdownTimerSupabase';
 
 // 現在のタイマー情報を取得するAPI
 export async function GET(request: Request) {

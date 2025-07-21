@@ -11,7 +11,7 @@ import { useSocket } from '@/contexts/SocketContext';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { TimerSettings } from '@/lib/countdownTimer';
+import { TimerSettings } from '@/lib/countdownTimerSupabase';
 import { useTimerData } from '@/hooks/useTimerData';
 
 export default function TimerPage() {

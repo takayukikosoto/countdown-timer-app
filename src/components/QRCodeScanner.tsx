@@ -1,14 +1,20 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
-import { BrowserQRCodeReader, IScannerControls } from '@zxing/browser';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+
+// 型定義のみをインポート（実際のクラスは動的にインポート）
+interface IScannerControls {
+  stop(): void;
+}
 
 interface QRCodeScannerProps {
   onScan: (token: string) => void;
   onClose: () => void;
 }
 
-export default function QRCodeScanner({ onScan, onClose }: QRCodeScannerProps) {
+function QRCodeScanner({ onScan, onClose }: QRCodeScannerProps) {
   const [error, setError] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [controls, setControls] = useState<IScannerControls | null>(null);
@@ -19,10 +25,12 @@ export default function QRCodeScanner({ onScan, onClose }: QRCodeScannerProps) {
       setIsScanning(true);
       setError(null);
       
+      // @zxing/browserを動的にインポート（SSR対応）
+      const { BrowserQRCodeReader } = await import('@zxing/browser');
       const codeReader = new BrowserQRCodeReader();
       
       // 利用可能なビデオデバイスを取得
-      const videoDevices = await BrowserQRCodeReader.listVideoInputDevices();
+      const videoDevices: any[] = await BrowserQRCodeReader.listVideoInputDevices();
       
       if (videoDevices.length === 0) {
         throw new Error('カメラが見つかりません');
@@ -137,3 +145,5 @@ export default function QRCodeScanner({ onScan, onClose }: QRCodeScannerProps) {
     </Card>
   );
 }
+
+export default QRCodeScanner;

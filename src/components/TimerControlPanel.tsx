@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useSocket } from '@/contexts/SocketContext';
-import { TimerSettings, TimerType } from '@/lib/countdownTimer';
+import { TimerSettings, TimerType } from '@/lib/countdownTimerSupabase';
 
 interface TimerControlPanelProps {
   className?: string;

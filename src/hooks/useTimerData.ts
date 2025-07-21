@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { TimerSettings, TimerMessage } from '@/lib/countdownTimer';
+import { TimerSettings, TimerMessage } from '@/lib/countdownTimerSupabase';
 
 // タイマーデータを取得するためのカスタムフック
 export function useTimerData() {

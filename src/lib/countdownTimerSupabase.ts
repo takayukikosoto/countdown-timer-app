@@ -1,6 +1,6 @@
 /**
  * カウントダウンタイマー機能を管理するモジュール
- * Supabase実装
+ * Supabase実装（新テーブル・RPC関数対応版）
  */
 
 import { supabase } from './supabase';
@@ -11,7 +11,6 @@ import {
   TimerType,
   TimerMode
 } from './timerTypes';
-import { checkAndExecuteActions, resetTimerActions } from './timerActions';
 
 // 型定義をエクスポート（後方互換性のため）
 export type { TimerSettings, TimerMessage, TimerState, TimerType, TimerMode };
@@ -26,52 +25,97 @@ import {
 
 export { getRemainingTime, getElapsedTime, formatTime, getTimerStateText };
 
+// Supabaseレスポンス型の定義
+interface SupabaseTimer {
+  id: string;
+  name: string;
+  title?: string;
+  type: TimerType;
+  duration_ms: number;
+  state: TimerState;
+  started_at?: string;
+  paused_at?: string;
+  completed_at?: string;
+  show_seconds: boolean;
+  color: string;
+  overtime_color: string;
+  is_current: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+interface SupabaseTimerMessage {
+  id: string;
+  timer_id: string;
+  text: string;
+  color: string;
+  flash: boolean;
+  display_duration_ms: number;
+  created_at: string;
+}
+
+// Supabase形式からTimerSettings形式に変換
+function convertSupabaseToTimerSettings(supabaseTimer: SupabaseTimer): TimerSettings {
+  return {
+    id: supabaseTimer.id,
+    title: supabaseTimer.title || supabaseTimer.name,
+    type: supabaseTimer.type,
+    duration: supabaseTimer.duration_ms,
+    startTime: supabaseTimer.started_at ? new Date(supabaseTimer.started_at).getTime() : undefined,
+    pausedAt: supabaseTimer.paused_at ? new Date(supabaseTimer.paused_at).getTime() : undefined,
+    endTime: supabaseTimer.started_at ? new Date(supabaseTimer.started_at).getTime() + supabaseTimer.duration_ms : undefined,
+    elapsedTime: 0, // 必要に応じて計算
+    state: supabaseTimer.state,
+    mode: 'normal' as TimerMode, // デフォルト値
+    showSeconds: supabaseTimer.show_seconds,
+    playSound: true, // デフォルト値（後で設定追加可能）
+    color: supabaseTimer.color,
+    overtimeColor: supabaseTimer.overtime_color,
+    message: undefined // 必要に応じて別途取得
+  };
+}
+
+// Supabase形式からTimerMessage形式に変換
+function convertSupabaseToTimerMessage(supabaseMessage: SupabaseTimerMessage): TimerMessage {
+  return {
+    id: supabaseMessage.id,
+    text: supabaseMessage.text,
+    color: supabaseMessage.color,
+    flash: supabaseMessage.flash,
+    timestamp: new Date(supabaseMessage.created_at).getTime(),
+    timerId: supabaseMessage.timer_id
+  };
+}
+
 /**
  * 現在のタイマー設定を取得
  */
 export async function getCurrentTimer(): Promise<TimerSettings | null> {
   try {
-    // 現在のタイマーIDを取得
-    const { data: currentData, error: currentError } = await supabase
-      .from('current_timer')
-      .select('timer_id')
-      .single();
+    // 新しいRPC関数get_current_timer()を使用
+    const { data, error } = await supabase
+      .rpc('get_current_timer');
     
-    if (currentError || !currentData?.timer_id) {
-      console.log('現在のタイマーが設定されていません:', currentError?.message);
+    if (error) {
+      console.error('現在のタイマー取得エラー:', error.message);
       return null;
     }
     
-    // タイマー情報を取得
-    const { data: timer, error: timerError } = await supabase
-      .from('timers')
-      .select('*')
-      .eq('id', currentData.timer_id)
-      .single();
-    
-    if (timerError || !timer) {
-      console.error('タイマー情報の取得エラー:', timerError?.message);
+    // データが存在しない場合
+    if (!data || data.length === 0) {
+      console.log('現在のタイマーが設定されていません');
       return null;
     }
     
-    // Supabaseのカラム名をクライアント側の命名規則に変換
-    return {
-      id: timer.id,
-      title: timer.title,
-      type: timer.type as TimerType,
-      duration: timer.duration,
-      state: timer.state as TimerState,
-      mode: timer.mode as TimerMode,
-      startTime: timer.start_time ? new Date(timer.start_time).getTime() : undefined,
-      endTime: timer.end_time ? new Date(timer.end_time).getTime() : undefined,
-      pausedAt: timer.paused_at ? new Date(timer.paused_at).getTime() : undefined,
-      elapsedTime: timer.elapsed_time,
-      showSeconds: timer.show_seconds,
-      playSound: timer.play_sound,
-      color: timer.color,
-      overtimeColor: timer.overtime_color,
-      message: timer.message
-    };
+    // 配列の最初の要素を取得（RPCは配列で返す）
+    const timerData = Array.isArray(data) ? data[0] : data;
+    
+    if (!timerData) {
+      return null;
+    }
+    
+    // Supabase形式からTimerSettings形式に変換
+    return convertSupabaseToTimerSettings(timerData as SupabaseTimer);
   } catch (error) {
     console.error('getCurrentTimer エラー:', error);
     return null;
@@ -88,7 +132,7 @@ export async function saveTimer(timer: TimerSettings): Promise<void> {
       id: timer.id,
       title: timer.title,
       type: timer.type,
-      duration: timer.duration,
+      duration_ms: timer.duration,
       state: timer.state,
       mode: timer.mode,
       start_time: timer.startTime ? new Date(timer.startTime).toISOString() : null,
@@ -142,10 +186,11 @@ export async function saveTimer(timer: TimerSettings): Promise<void> {
       }
     }
     
-    // カウントダウンタイマーの場合、残り時間に基づいてアクションをチェック
+    // カウントダウンタイマーの場合の処理（将来的にアクション機能を追加可能）
     if (timer.type === 'countdown' && timer.state === 'running') {
       const remainingTime = getRemainingTime(timer);
-      await checkAndExecuteActions(timer.id, remainingTime);
+      // TODO: 将来的にタイマーアクション機能を実装予定
+      console.log('タイマー開始:', { timerId: timer.id, remainingTime });
     }
   } catch (error) {
     console.error('saveTimer エラー:', error);
@@ -158,76 +203,30 @@ export async function saveTimer(timer: TimerSettings): Promise<void> {
  */
 export async function startTimer(timerId: string): Promise<TimerSettings | null> {
   try {
-    // タイマー情報を取得
-    const { data: timer, error: timerError } = await supabase
-      .from('timers')
-      .select('*')
-      .eq('id', timerId)
-      .single();
+    // 新しいRPC関数start_timer()を使用
+    const { data, error } = await supabase
+      .rpc('start_timer', { p_timer_id: timerId });
     
-    if (timerError || !timer) {
-      console.error('タイマー情報の取得エラー:', timerError?.message);
+    if (error) {
+      console.error('タイマー開始エラー:', error.message);
       return null;
     }
     
-    const now = Date.now();
-    const updatedTimer: Partial<any> = {
-      state: 'running',
-      mode: 'normal',
-      updated_at: new Date().toISOString()
-    };
-    
-    // タイマーの状態を更新
-    if (timer.state === 'paused' && timer.paused_at && timer.elapsed_time) {
-      // 一時停止から再開
-      updatedTimer.start_time = new Date(now - timer.elapsed_time).toISOString();
-      updatedTimer.end_time = new Date(now - timer.elapsed_time + timer.duration).toISOString();
-    } else {
-      // 新規開始
-      updatedTimer.start_time = new Date(now).toISOString();
-      updatedTimer.end_time = new Date(now + timer.duration).toISOString();
-      updatedTimer.elapsed_time = 0;
-      
-      // タイマーアクションをリセット（新規開始時のみ）
-      await resetTimerActions(timerId);
-    }
-    
-    // タイマー情報を更新
-    const { data: updatedData, error: updateError } = await supabase
-      .from('timers')
-      .update(updatedTimer)
-      .eq('id', timerId)
-      .select()
-      .single();
-    
-    if (updateError || !updatedData) {
-      console.error('タイマー更新エラー:', updateError?.message);
+    // JSON応答をパース
+    if (!data?.success) {
+      console.error('タイマー開始失敗:', data?.error);
       return null;
     }
     
-    // クライアント側の命名規則に変換
-    const clientTimer: TimerSettings = {
-      id: updatedData.id,
-      title: updatedData.title,
-      type: updatedData.type,
-      duration: updatedData.duration,
-      state: updatedData.state,
-      mode: updatedData.mode,
-      startTime: updatedData.start_time ? new Date(updatedData.start_time).getTime() : undefined,
-      endTime: updatedData.end_time ? new Date(updatedData.end_time).getTime() : undefined,
-      pausedAt: updatedData.paused_at ? new Date(updatedData.paused_at).getTime() : undefined,
-      elapsedTime: updatedData.elapsed_time,
-      showSeconds: updatedData.show_seconds,
-      playSound: updatedData.play_sound,
-      color: updatedData.color,
-      overtimeColor: updatedData.overtime_color,
-      message: updatedData.message
-    };
+    // タイマー情報を取得して返す
+    const timerData = data.timer;
+    if (!timerData) {
+      console.error('タイマーデータが返されませんでした');
+      return null;
+    }
     
-    // 現在のタイマーとして設定
-    await saveTimer(clientTimer);
-    
-    return clientTimer;
+    // Supabase形式からTimerSettings形式に変換
+    return convertSupabaseToTimerSettings(timerData as SupabaseTimer);
   } catch (error) {
     console.error('startTimer エラー:', error);
     return null;
@@ -239,33 +238,30 @@ export async function startTimer(timerId: string): Promise<TimerSettings | null>
  */
 export async function pauseTimer(timerId: string): Promise<TimerSettings | null> {
   try {
-    const timer = await getCurrentTimer();
+    // 新しいRPC関数pause_timer()を使用
+    const { data, error } = await supabase
+      .rpc('pause_timer', { p_timer_id: timerId });
     
-    if (!timer || timer.id !== timerId || timer.state !== 'running') {
+    if (error) {
+      console.error('タイマー一時停止エラー:', error.message);
       return null;
     }
     
-    const now = Date.now();
-    const updatedTimer = {
-      paused_at: new Date(now).toISOString(),
-      elapsed_time: timer.startTime ? now - timer.startTime : 0,
-      state: 'paused' as TimerState,
-      updated_at: new Date().toISOString()
-    };
-    
-    // タイマー情報を更新
-    const { error: updateError } = await supabase
-      .from('timers')
-      .update(updatedTimer)
-      .eq('id', timerId);
-    
-    if (updateError) {
-      console.error('タイマー一時停止エラー:', updateError.message);
+    // JSON応答をパース
+    if (!data?.success) {
+      console.error('タイマー一時停止失敗:', data?.error);
       return null;
     }
     
-    // 更新後のタイマー情報を取得
-    return await getCurrentTimer();
+    // タイマー情報を取得して返す
+    const timerData = data.timer;
+    if (!timerData) {
+      console.error('タイマーデータが返されませんでした');
+      return null;
+    }
+    
+    // Supabase形式からTimerSettings形式に変換
+    return convertSupabaseToTimerSettings(timerData as SupabaseTimer);
   } catch (error) {
     console.error('pauseTimer エラー:', error);
     return null;
@@ -277,44 +273,30 @@ export async function pauseTimer(timerId: string): Promise<TimerSettings | null>
  */
 export async function resetTimer(timerId: string): Promise<TimerSettings | null> {
   try {
-    // タイマー情報を取得
-    const { data: timer, error: timerError } = await supabase
-      .from('timers')
-      .select('*')
-      .eq('id', timerId)
-      .single();
+    // 新しいRPC関数reset_timer()を使用
+    const { data, error } = await supabase
+      .rpc('reset_timer', { p_timer_id: timerId });
     
-    if (timerError || !timer) {
-      console.error('タイマー情報の取得エラー:', timerError?.message);
+    if (error) {
+      console.error('タイマーリセットエラー:', error.message);
       return null;
     }
     
-    const updatedTimer = {
-      state: 'idle' as TimerState,
-      start_time: null,
-      end_time: null,
-      paused_at: null,
-      elapsed_time: 0,
-      mode: 'normal' as TimerMode,
-      updated_at: new Date().toISOString()
-    };
-    
-    // タイマーアクションをリセット
-    await resetTimerActions(timerId);
-    
-    // タイマー情報を更新
-    const { error: updateError } = await supabase
-      .from('timers')
-      .update(updatedTimer)
-      .eq('id', timerId);
-    
-    if (updateError) {
-      console.error('タイマーリセットエラー:', updateError.message);
+    // JSON応答をパース
+    if (!data?.success) {
+      console.error('タイマーリセット失敗:', data?.error);
       return null;
     }
     
-    // 更新後のタイマー情報を取得
-    return await getCurrentTimer();
+    // タイマー情報を取得して返す
+    const timerData = data.timer;
+    if (!timerData) {
+      console.error('タイマーデータが返されませんでした');
+      return null;
+    }
+    
+    // Supabase形式からTimerSettings形式に変換
+    return convertSupabaseToTimerSettings(timerData as SupabaseTimer);
   } catch (error) {
     console.error('resetTimer エラー:', error);
     return null;
@@ -326,49 +308,44 @@ export async function resetTimer(timerId: string): Promise<TimerSettings | null>
  */
 export async function createTimer(settings: Partial<TimerSettings>): Promise<TimerSettings> {
   try {
-    const id = settings.id || `timer_${Date.now()}`;
+    // デフォルト設定
+    const name = settings.title || 'カウントダウンタイマー';
+    const title = settings.title || 'カウントダウン';
+    const type = settings.type || 'countdown';
+    const duration_ms = settings.duration || 5 * 60 * 1000; // デフォルト5分
+    const color = settings.color || '#3B82F6';
     
-    const defaultTimer: TimerSettings = {
-      id,
-      title: settings.title || 'カウントダウン',
-      type: settings.type || 'countdown',
-      duration: settings.duration || 5 * 60 * 1000, // デフォルト5分
-      state: 'idle',
-      mode: 'normal',
-      showSeconds: true,
-      playSound: false,
-      color: settings.color || '#3b82f6', // blue-500
-      overtimeColor: settings.overtimeColor || '#ef4444', // red-500
-      message: settings.message
-    };
+    // 新しいRPC関数create_timer()を使用
+    const { data: newTimerId, error } = await supabase
+      .rpc('create_timer', {
+        p_name: name,
+        p_title: title,
+        p_type: type,
+        p_duration_ms: duration_ms,
+        p_color: color
+      });
     
-    const timer = { ...defaultTimer, ...settings };
-    
-    // Supabaseのカラム名に変換
-    const timerData = {
-      id: timer.id,
-      title: timer.title,
-      type: timer.type,
-      duration: timer.duration,
-      state: timer.state,
-      mode: timer.mode,
-      show_seconds: timer.showSeconds,
-      play_sound: timer.playSound,
-      color: timer.color,
-      overtime_color: timer.overtimeColor,
-      message: timer.message
-    };
-    
-    // タイマー情報を保存
-    const { error: insertError } = await supabase
-      .from('timers')
-      .insert(timerData);
-    
-    if (insertError) {
-      throw new Error(`タイマー作成エラー: ${insertError.message}`);
+    if (error) {
+      throw new Error(`タイマー作成エラー: ${error.message}`);
     }
     
-    return timer;
+    if (!newTimerId) {
+      throw new Error('タイマーIDが返されませんでした');
+    }
+    
+    // 作成されたタイマーを取得して返す
+    const { data: createdTimer, error: fetchError } = await supabase
+      .from('timers')
+      .select('*')
+      .eq('id', newTimerId)
+      .single();
+    
+    if (fetchError || !createdTimer) {
+      throw new Error(`作成されたタイマーの取得エラー: ${fetchError?.message}`);
+    }
+    
+    // Supabase形式からTimerSettings形式に変換
+    return convertSupabaseToTimerSettings(createdTimer as SupabaseTimer);
   } catch (error) {
     console.error('createTimer エラー:', error);
     throw error;
@@ -436,7 +413,7 @@ export async function getAllTimers(): Promise<TimerSettings[]> {
       id: timer.id,
       title: timer.title,
       type: timer.type as TimerType,
-      duration: timer.duration,
+      duration: timer.duration_ms,
       state: timer.state as TimerState,
       mode: timer.mode as TimerMode,
       startTime: timer.start_time ? new Date(timer.start_time).getTime() : undefined,
@@ -560,7 +537,7 @@ export async function getAllTimerMessages(): Promise<TimerMessage[]> {
     const { data: messages, error } = await supabase
       .from('timer_messages')
       .select('*')
-      .order('timestamp', { ascending: false });
+      .order('created_at', { ascending: false });
     
     if (error) {
       console.error('メッセージリスト取得エラー:', error.message);

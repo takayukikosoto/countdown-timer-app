@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { SocketProvider } from '@/contexts/SocketContext';
 import { useSocket } from '@/contexts/SocketContext';
 import CountdownTimer from '@/components/CountdownTimer';
-import { TimerSettings, TimerMessage as TimerMessageType } from '@/lib/countdownTimer';
+import { TimerSettings, TimerMessage as TimerMessageType } from '@/lib/countdownTimerSupabase';
 import { useStatusData } from '@/hooks/useStatusData';
 
 export default function TimerDisplayPage() {

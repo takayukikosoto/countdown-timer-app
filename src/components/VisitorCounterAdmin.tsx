@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useVisitorCount } from '@/hooks/useVisitorCount_fixed';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { PlusIcon, MinusIcon, RotateCcwIcon } from 'lucide-react';
+import { Plus, Minus, RotateCcw } from 'lucide-react';
 
 interface VisitorCounterAdminProps {
   className?: string;
@@ -72,7 +72,7 @@ export default function VisitorCounterAdmin({ className = '' }: VisitorCounterAd
             onClick={handleDecrement}
             disabled={loading || count < incrementValue}
           >
-            <MinusIcon className="w-5 h-5 mr-1" />
+            <Minus className="w-5 h-5 mr-1" />
             減少
           </Button>
           
@@ -90,7 +90,7 @@ export default function VisitorCounterAdmin({ className = '' }: VisitorCounterAd
             onClick={handleIncrement}
             disabled={loading}
           >
-            <PlusIcon className="w-5 h-5 mr-1" />
+            <Plus className="w-5 h-5 mr-1" />
             増加
           </Button>
         </div>
@@ -102,7 +102,7 @@ export default function VisitorCounterAdmin({ className = '' }: VisitorCounterAd
           onClick={handleReset}
           disabled={loading}
         >
-          <RotateCcwIcon className="w-5 h-5 mr-1" />
+          <RotateCcw className="w-5 h-5 mr-1" />
           リセット
         </Button>
         

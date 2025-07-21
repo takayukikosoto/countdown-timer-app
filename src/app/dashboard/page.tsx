@@ -14,7 +14,7 @@ import { formatDateTime } from '@/lib/timeSync';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 
-export default function Dashboard() {
+function Dashboard() {
   // 認証状態を取得
   const { user, loading, isAdmin, logout } = useAuth();
   const router = useRouter();
@@ -291,3 +291,5 @@ export default function Dashboard() {
     </div>
   );
 }
+
+export default Dashboard;

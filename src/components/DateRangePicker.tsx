@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
-import { CalendarIcon } from 'lucide-react';
+import { Calendar } from 'lucide-react';
 
 interface DateRangePickerProps {
   onDateRangeChange: (startDate: Date, endDate: Date) => void;
@@ -57,7 +57,7 @@ export default function DateRangePicker({ onDateRangeChange, className = '' }: D
         <span>
           {formatDisplayDate(startDate)} 〜 {formatDisplayDate(endDate)}
         </span>
-        <CalendarIcon className="h-4 w-4 ml-2" />
+        <Calendar className="h-4 w-4 ml-2" />
       </Button>
       
       {isOpen && (

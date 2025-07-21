@@ -19,16 +19,17 @@ import CurrentDateTime from '@/components/CurrentDateTime';
 import { 
   Calendar, 
   Users, 
-  Timer, 
-  BarChart3, 
+  Activity, 
   Settings, 
-  UserCheck, 
+  Shield, 
+  LogOut, 
+  LogIn, 
+  Check,
   Monitor,
   Clock,
-  Activity,
-  Shield,
-  LogIn,
-  LogOut
+  Timer,
+  BarChart,
+  User
 } from 'lucide-react';
 
 export default function Home() {
@@ -223,44 +224,114 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 relative overflow-hidden">
+      {/* Background Pattern */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-100/20 via-transparent to-transparent"></div>
+      <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-300/10 rounded-full blur-3xl"></div>
+      <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-300/10 rounded-full blur-3xl"></div>
       {/* ヘッダー */}
-      <header className="bg-white/90 backdrop-blur-md shadow-sm border-b">
-        <div className="container mx-auto px-4 py-4">
+      <header className="bg-gradient-to-r from-slate-900/95 via-blue-900/95 to-indigo-900/95 backdrop-blur-xl shadow-2xl border-b border-white/10 relative z-10 overflow-hidden">
+        {/* ヘッダーの装飾的背景 */}
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 via-purple-600/10 to-indigo-600/10"></div>
+        <div className="absolute -top-2 -right-20 w-40 h-40 bg-blue-500/20 rounded-full blur-3xl"></div>
+        <div className="absolute -top-2 -left-20 w-40 h-40 bg-indigo-500/20 rounded-full blur-3xl"></div>
+        
+        <div className="container mx-auto px-6 py-6 relative">
           <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-3">
-              <Calendar className="h-8 w-8 text-blue-600" />
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">イベント管理システム</h1>
-                <p className="text-sm text-gray-600">{formattedDate}</p>
+            <div className="flex items-center space-x-6">
+              {/* ロゴ・タイトル部分 */}
+              <div className="flex items-center space-x-4">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-indigo-400 rounded-xl blur-sm opacity-75"></div>
+                  <div className="relative bg-gradient-to-br from-blue-500 to-indigo-600 p-3 rounded-xl shadow-lg">
+                    <Activity className="h-8 w-8 text-white" />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-white via-blue-100 to-indigo-100 bg-clip-text text-transparent tracking-tight">
+                    Event <span className="bg-gradient-to-r from-blue-300 to-indigo-300 bg-clip-text text-transparent font-extrabold">Control</span>
+                  </h1>
+                  <div className="flex items-center space-x-2 text-xs text-blue-100/80">
+                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                    <span className="font-medium tracking-wide uppercase">{formattedDate}</span>
+                  </div>
+                </div>
               </div>
             </div>
             
-            <div className="flex items-center space-x-4">
-              <ConnectionStatus isConnected={true} />
-              <ServerClock />
+            {/* 右側ステータスエリア */}
+            <div className="flex items-center space-x-6">
+              {/* 接続ステータス */}
+              <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2">
+                <ConnectionStatus isConnected={true} />
+              </div>
+              
+              {/* 小型カウントダウン表示 */}
+              {currentTimer && (
+                <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2">
+                  <div className="flex items-center space-x-3">
+                    <div className="relative">
+                      <Timer className="h-5 w-5 text-blue-300" />
+                      <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                    </div>
+                    <CountdownTimer 
+                      timer={currentTimer} 
+                      size="sm" 
+                      className="text-sm font-mono font-bold text-white tracking-wide"
+                    />
+                  </div>
+                </div>
+              )}
+              
+              {/* サーバークロック */}
+              <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2">
+                <ServerClock />
+              </div>
               
               {user ? (
-                <div className="flex items-center space-x-3">
-                  <Badge variant={isAdmin ? 'default' : 'secondary'}>
-                    {isAdmin ? '管理者' : isStaff ? 'スタッフ' : 'ゲスト'}
-                  </Badge>
-                  <span className="text-sm text-gray-700">{user.user_metadata?.name || user.email || 'ユーザー'}</span>
+                <div className="flex items-center space-x-4">
+                  {/* ユーザー情報 */}
+                  <div className="flex items-center space-x-3">
+                    <div className="relative">
+                      <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full flex items-center justify-center">
+                        <User className="h-4 w-4 text-white" />
+                      </div>
+                      <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-400 rounded-full"></div>
+                    </div>
+                    <div className="space-y-0.5">
+                      <Badge 
+                        variant={isAdmin ? 'default' : 'secondary'}
+                        className={`${isAdmin 
+                          ? 'bg-gradient-to-r from-amber-400 to-orange-500 text-white' 
+                          : isStaff 
+                            ? 'bg-gradient-to-r from-blue-400 to-indigo-500 text-white'
+                            : 'bg-white/20 text-white'
+                        } text-xs font-bold px-2 py-1 border-0`}
+                      >
+                        {isAdmin ? '管理者' : isStaff ? 'スタッフ' : 'ゲスト'}
+                      </Badge>
+                      <div className="text-sm text-blue-100 font-medium">
+                        {user.user_metadata?.name || user.email?.split('@')[0] || 'ユーザー'}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* ログアウトボタン */}
                   <Button 
-                    variant="outline" 
+                    variant="ghost" 
                     size="sm" 
                     onClick={handleLogout}
                     disabled={logoutLoading}
-                    className="flex items-center space-x-1"
+                    className="text-white hover:bg-white/10 transition-colors duration-200"
                   >
-                    <LogOut className="h-4 w-4" />
+                    <LogOut className="h-4 w-4 mr-2" />
                     <span>ログアウト</span>
                   </Button>
                 </div>
               ) : (
                 <Link href="/login">
-                  <Button className="flex items-center space-x-1">
-                    <LogIn className="h-4 w-4" />
+                  <Button variant="ghost" className="text-white hover:bg-white/10 transition-colors duration-200">
+                    <LogIn className="h-4 w-4 mr-2" />
                     <span>ログイン</span>
                   </Button>
                 </Link>
@@ -271,93 +342,113 @@ export default function Home() {
       </header>
 
       {/* メインコンテンツ */}
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-12 relative z-10">
         {/* システム概要 */}
-        <section className="mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card>
+        <section className="mb-12">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <Card className="bg-white/70 backdrop-blur-lg border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 group">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">イベント状態</CardTitle>
-                <Activity className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm font-semibold text-gray-700">イベント状態</CardTitle>
+                <Activity className="h-5 w-5 text-blue-500 group-hover:scale-110 transition-transform duration-300" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{systemStatus.event}</div>
-                <p className="text-xs text-muted-foreground mt-1">リアルタイム更新</p>
+                <div className="text-3xl font-bold text-gray-900 mb-1">{systemStatus.event}</div>
+                <p className="text-xs text-gray-500 font-medium">
+                  リアルタイム更新
+                </p>
               </CardContent>
             </Card>
             
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">来場者数</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm font-semibold text-gray-700">来場者数</CardTitle>
+                <Users className="h-5 w-5 text-indigo-500 group-hover:scale-110 transition-transform duration-300" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{systemStatus.visitors}</div>
-                <p className="text-xs text-muted-foreground mt-1">本日の総来場者数</p>
+                <div className="text-3xl font-bold text-gray-900 mb-1">{systemStatus.visitors}</div>
+                <p className="text-xs text-gray-500 font-medium">
+                  本日の総来場者数
+                </p>
               </CardContent>
             </Card>
             
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">システム状態</CardTitle>
-                <Shield className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm font-semibold text-gray-700">システム状態</CardTitle>
+                <Check className="h-5 w-5 text-green-500 group-hover:scale-110 transition-transform duration-300" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-600">{systemStatus.connection}</div>
-                <p className="text-xs text-muted-foreground mt-1">すべてのサービスが正常稼働中</p>
+                <div className="text-3xl font-bold text-green-600 mb-1">オンライン</div>
+                <p className="text-xs text-gray-500 font-medium">
+                  すべてのサービスが正常稼働中
+                </p>
               </CardContent>
             </Card>
           </div>
         </section>
 
         {/* 機能メニュー */}
-        <section className="mb-8">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-6">機能メニュー</h2>
+        <section className="mb-12">
+          <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center">
+            <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">機能メニュー</span>
+          </h2>
           
           {/* 管理者向け */}
           {isAdmin && (
             <div className="mb-8">
-              <h3 className="text-lg font-medium text-gray-800 mb-4 flex items-center">
-                <Shield className="h-5 w-5 mr-2" />
-                管理者機能
+              <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center justify-center md:justify-start">
+                <Shield className="h-6 w-6 mr-3 text-blue-600" />
+                <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">管理者機能</span>
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Link href="/dashboard">
-                  <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-                    <CardContent className="flex flex-col items-center p-6">
-                      <BarChart3 className="h-8 w-8 text-blue-600 mb-2" />
-                      <h4 className="font-medium text-center">管理ダッシュボード</h4>
-                      <p className="text-sm text-gray-600 text-center mt-1">システム全体の監視・管理</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <Link href="/dashboard" className="group">
+                  <Card className="bg-gradient-to-br from-blue-50 to-blue-100/50 border-0 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 cursor-pointer overflow-hidden relative">
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    <CardContent className="flex flex-col items-center p-8 relative z-10">
+                      <div className="bg-blue-500/10 p-4 rounded-full mb-4 group-hover:bg-blue-500/20 transition-colors duration-300">
+                        <BarChart className="h-8 w-8 text-purple-600 group-hover:scale-110 transition-transform duration-300" />
+                      </div>
+                      <h4 className="font-bold text-center text-gray-900 mb-2">管理ダッシュボード</h4>
+                      <p className="text-sm text-gray-600 text-center leading-relaxed">システム全体の監視・管理</p>
                     </CardContent>
                   </Card>
                 </Link>
                 
-                <Link href="/admin">
-                  <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-                    <CardContent className="flex flex-col items-center p-6">
-                      <BarChart3 className="h-8 w-8 text-indigo-600 mb-2" />
-                      <h4 className="font-medium text-center">統計レポート</h4>
-                      <p className="text-sm text-gray-600 text-center mt-1">ロール別・企業別統計分析</p>
+                <Link href="/admin" className="group">
+                  <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100/50 border-0 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 cursor-pointer overflow-hidden relative">
+                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    <CardContent className="flex flex-col items-center p-8 relative z-10">
+                      <div className="bg-indigo-500/10 p-4 rounded-full mb-4 group-hover:bg-indigo-500/20 transition-colors duration-300">
+                        <BarChart className="h-8 w-8 text-indigo-600 group-hover:scale-110 transition-transform duration-300" />
+                      </div>
+                      <h4 className="font-bold text-center text-gray-900 mb-2">統計レポート</h4>
+                      <p className="text-sm text-gray-600 text-center leading-relaxed">ロール別・企業別統計分析</p>
                     </CardContent>
                   </Card>
                 </Link>
                 
-                <Link href="/admin/users">
-                  <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-                    <CardContent className="flex flex-col items-center p-6">
-                      <UserCheck className="h-8 w-8 text-green-600 mb-2" />
-                      <h4 className="font-medium text-center">ユーザー管理</h4>
-                      <p className="text-sm text-gray-600 text-center mt-1">スタッフ・参加者の管理</p>
+                <Link href="/admin/users" className="group">
+                  <Card className="bg-gradient-to-br from-green-50 to-green-100/50 border-0 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 cursor-pointer overflow-hidden relative">
+                    <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    <CardContent className="flex flex-col items-center p-8 relative z-10">
+                      <div className="bg-green-500/10 p-4 rounded-full mb-4 group-hover:bg-green-500/20 transition-colors duration-300">
+                        <User className="h-8 w-8 text-green-600 group-hover:scale-110 transition-transform duration-300" />
+                      </div>
+                      <h4 className="font-bold text-center text-gray-900 mb-2">ユーザー管理</h4>
+                      <p className="text-sm text-gray-600 text-center leading-relaxed">スタッフ・参加者の管理</p>
                     </CardContent>
                   </Card>
                 </Link>
                 
-                <Link href="/admin/visitors">
-                  <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-                    <CardContent className="flex flex-col items-center p-6">
-                      <Users className="h-8 w-8 text-purple-600 mb-2" />
-                      <h4 className="font-medium text-center">来場者管理</h4>
-                      <p className="text-sm text-gray-600 text-center mt-1">来場者数・統計の管理</p>
+                <Link href="/admin/visitors" className="group">
+                  <Card className="bg-gradient-to-br from-purple-50 to-purple-100/50 border-0 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 cursor-pointer overflow-hidden relative">
+                    <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    <CardContent className="flex flex-col items-center p-8 relative z-10">
+                      <div className="bg-purple-500/10 p-4 rounded-full mb-4 group-hover:bg-purple-500/20 transition-colors duration-300">
+                        <Users className="h-8 w-8 text-purple-600 group-hover:scale-110 transition-transform duration-300" />
+                      </div>
+                      <h4 className="font-bold text-center text-gray-900 mb-2">来場者管理</h4>
+                      <p className="text-sm text-gray-600 text-center leading-relaxed">来場者数・統計の管理</p>
                     </CardContent>
                   </Card>
                 </Link>
@@ -379,7 +470,7 @@ export default function Home() {
           {(isAdmin || isStaff) && (
             <div className="mb-8">
               <h3 className="text-lg font-medium text-gray-800 mb-4 flex items-center">
-                <UserCheck className="h-5 w-5 mr-2" />
+                <User className="h-5 w-5 mr-2" />
                 スタッフ機能
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

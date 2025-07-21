@@ -191,7 +191,7 @@ export function useTimerDataSupabase() {
       let query = supabase
         .from('timer_messages')
         .select('*')
-        .order('timestamp', { ascending: false });
+        .order('created_at', { ascending: false });
       
       // 特定のタイマーのメッセージのみを取得
       if (timerId) {

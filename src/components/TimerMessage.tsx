@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { TimerMessage as TimerMessageType } from '@/lib/countdownTimer';
+import { TimerMessage as TimerMessageType } from '@/lib/countdownTimerSupabase';
 
 interface TimerMessageProps {
   message: TimerMessageType | null;

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { TimerSettings, TimerMessage } from '@/lib/countdownTimer';
+import { TimerSettings, TimerMessage } from '@/lib/countdownTimerSupabase';
 import { useSocket } from '@/contexts/SocketContext';
 
 interface CountdownTimerProps {
