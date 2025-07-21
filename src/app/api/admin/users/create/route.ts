@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     const saltRounds = 10;
     const password_hash = await bcrypt.hash(password, saltRounds);
 
-    // ユーザーを作成
+    // admin_usersテーブルにユーザーを作成
     const { data: newUser, error } = await supabase
       .from('admin_users')
       .insert({
@@ -57,9 +57,32 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error('ユーザー作成エラー:', error);
+      console.error('admin_usersテーブルへのユーザー作成エラー:', error);
       return NextResponse.json(
         { error: `ユーザーの作成に失敗しました: ${error.message}` },
+        { status: 500 }
+      );
+    }
+
+    // 認証用にusersテーブルにも同じユーザー情報を作成
+    // （check_user_password関数がusersテーブルを参照するため）
+    const { error: usersError } = await supabase
+      .from('users')
+      .insert({
+        id: newUser.id,
+        username,
+        password: password_hash, // usersテーブルのpasswordカラム名
+        role: role as UserRole,
+        display_name,
+        company: company || null
+      });
+
+    if (usersError) {
+      console.error('usersテーブルへのユーザー作成エラー:', usersError);
+      // admin_usersテーブルからも削除してロールバック
+      await supabase.from('admin_users').delete().eq('id', newUser.id);
+      return NextResponse.json(
+        { error: `認証用ユーザー情報の作成に失敗しました: ${usersError.message}` },
         { status: 500 }
       );
     }
